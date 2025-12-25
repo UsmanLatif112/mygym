@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% set hide_sidebar = True %}
+{% block content %}
+<div class="login-container">
+    <img src="{{ url_for('static', filename='logo.png') }}" class="logo-center" style="max-width:90px; margin-bottom:22px;"/>
+    <h2>Welcome to My Gym</h2>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div>
+            {{ form.username.label }}<br>
+            {{ form.username(size=32, placeholder='Enter your username') }}
+        </div>
+        <div>
+            {{ form.password.label }}<br>
+            {{ form.password(size=32, placeholder='Enter your password') }}
+        </div>
+        <div>
+            {{ form.submit(class_='leet-btn') }}
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color:#ff7300; letter-spacing:1px;">Dashboard</h1>
+<div style="display:flex; gap:28px; flex-wrap:wrap; margin-top:30px;">
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa fa-users"></i></div>
+    <div class="card-title">Total Customers</div>
+    <div class="card-num">{{ total_customers }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa fa-users"></i></div>
+    <div class="card-title">Active Customers</div>
+    <div class="card-num">{{ active_customers }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa fa-file-invoice-dollar"></i></div>
+    <div class="card-title">Pending Bills</div>
+    <div class="card-num">{{ pending_billing_customers }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa-solid fa-user-tie"></i></div>
+    <div class="card-title">Total Employee</div>
+    <div class="card-num">{{ total_employees }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa fa-dumbbell"></i></div>
+    <div class="card-title">Active Trainers</div>
+    <div class="card-num">{{ trainers_count }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa-solid fa-user-tie"></i></div>
+    <div class="card-title">Office Boys</div>
+    <div class="card-num">{{ office_boy_count }}</div>
+  </div>
+  <div class="card-dash">
+    <div class="card-icon"><i class="fa-solid fa-user"></i> <i class="fa-solid fa-dumbbell"></i></i></div>
+    <div class="card-title">Active PT Customers</div>
+    <div class="card-num">{{ personal_training_customers }}</div>
+  </div>
+  
+</div>
+{% endblock %}
+<div class="card-dash">
+    <div class="card-icon"><i class="fa fa-wallet"></i></div>
+    <div class="card-title">Total Expenses</div>
+    <div class="card-num">$2,800</div>
+  </div>

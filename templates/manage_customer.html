@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Manage Customer</h1>
+<div class="add-customer-full-bg">
+  <div class="add-customer-card customer-card">
+    <a href="{{ url_for('customers') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
+    </a>
+    <div class="customer-header">
+      <div>
+        <h2 class="customer-name">{{ customer.name }}</h2>
+        <div class="customer-membership">
+          Membership No: {{ customer.membership_no or 'No data found' }}
+        </div>
+        <div class="customer-status-row">
+          Status:
+          {% if customer.status and customer.status|lower == 'active' %}
+            <span class="status-badge status-active">{{ customer.status }}</span>
+          {% elif customer.status and customer.status|lower == 'not paid' %}
+            <span class="status-badge status-unpaid">{{ customer.status }}</span>
+          {% else %}
+            <span class="status-badge status-inactive">{{ customer.status or 'No data found' }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="customer-actions-row">
+        {% if customer.status and customer.status|lower == 'not paid' %}
+            <button class="sleet-btn status-btn" id="open-status-modal" type="button">
+            <i class="fa fa-sync"></i> Update Status
+            </button>
+        {% endif %}
+        <a href="{{ url_for('edit_customer', cnic=customer.cnic) }}" class="sleet-btn">
+            <i class="fa fa-edit"></i> Edit
+        </a>
+        <a href="{{ url_for('delete_customer', cnic=customer.cnic) }}" class="sleet-btn delete-btn">
+            <i class="fa fa-trash"></i> Delete
+        </a>
+        </div>
+    </div>
+    <hr class="customer-divider">
+    <div class="customer-info-grid">
+      <div><strong>Admission Date:</strong> <span>{{ customer.admission_date.strftime('%Y-%m-%d') if customer.admission_date else 'No data found' }}</span></div>
+      <div><strong>Billing Date:</strong> <span>{{ customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else 'No data found' }}</span></div>
+      <div><strong>Type:</strong> <span>{{ customer.type or 'No data found' }}</span></div>
+      <div><strong>Package:</strong> <span>{{ customer.package or 'No data found' }}</span></div>
+      <div><strong>CNIC:</strong> <span>{{ customer.cnic or 'No data found' }}</span></div>
+      <div><strong>Email:</strong> <span>{{ customer.email or 'No data found' }}</span></div>
+      <div><strong>Phone:</strong> <span>{{ customer.phone or 'No data found' }}</span></div>
+      <div><strong>Emergency Contact:</strong> <span>{{ customer.emergency_contact or 'No data found' }}</span></div>
+      <div><strong>Father/Husband Name:</strong> <span>{{ customer.father_or_husband or 'No data found' }}</span></div>
+      <div><strong>Gender:</strong> <span>{{ customer.gender or 'No data found' }}</span></div>
+      <div><strong>Marital Status:</strong> <span>{{ customer.marital_status or 'No data found' }}</span></div>
+      <div><strong>Blood Group:</strong> <span>{{ customer.blood_group or 'No data found' }}</span></div>
+      <div><strong>Date of Birth:</strong> <span>{{ customer.dob.strftime('%Y-%m-%d') if customer.dob else 'No data found' }}</span></div>
+      <div><strong>Height (cm):</strong> <span>{{ customer.height or 'No data found' }}</span></div>
+      <div><strong>Weight (kg):</strong> <span>{{ customer.weight or 'No data found' }}</span></div>
+      <div><strong>Waist (cm):</strong> <span>{{ customer.waist or 'No data found' }}</span></div>
+      <div><strong>Profession:</strong> <span>{{ customer.profession or 'No data found' }}</span></div>
+      <div><strong>Nationality:</strong> <span>{{ customer.nationality or 'No data found' }}</span></div>
+      <div><strong>Address:</strong> <span>{{ customer.address or 'No data found' }}</span></div>
+      <div><strong>Personal Training Time:</strong> <span>{{ customer.personal_training_time or 'No data found' }}</span></div>
+      <div><strong>Trainer:</strong> <span>{{ customer.trainer or 'No data found' }}</span></div>
+      <div><strong>BMI Test:</strong> <span>{{ customer.bmi_test or 'No data found' }}</span></div>
+      <div><strong>BMI Value:</strong> <span>{{ customer.bmi_value or 'No data found' }}</span></div>
+      <div><strong>Terms Accepted:</strong> <span>{{ 'Yes' if customer.terms_accepted else 'No' }}</span></div>
+      <div><strong>Illnesses:</strong> <span>{{ customer.illnesses or 'No data found' }}</span></div>
+      <div><strong>Join Reasons:</strong> <span>{{ customer.join_reasons or 'No data found' }}</span></div>
+      
+    </div>
+    <!-- Update Status Modal -->
+    <div id="statusModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <h2>Update Status & Payment</h2>
+        <form id="statusUpdateForm" method="POST" action="{{ url_for('update_status', cnic=customer.cnic) }}">
+        <div class="form-group">
+            <label>Package</label>
+            <input type="text" value="{{ customer.package or '' }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>Amount to be Paid</label>
+            <input type="text" id="amount-to-be-paid" value="{{ amount_to_be_paid }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>Paid Amount</label>
+            <input type="number" min="0" step="1" name="paid_amount" id="paid-amount-input" required>
+        </div>
+        <div class="form-group">
+            <label>Remaining Amount</label>
+            <input type="text" id="remaining-amount" value="{{ remaining_amount }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>Next Billing Date</label>
+            <input type="text" value="{{ customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else '' }}" readonly>
+        </div>
+        <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method" class="form-input" required>
+                <option value="">Select payment method</option>
+                <option value="Cash">Cash</option>
+                <option value="Online">Online</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Payment Collected By</label>
+            <select name="collector_name" class="form-input" required>
+                <option value="">Select employee</option>
+                {% for emp in employees %}
+                    <option value="{{ emp.name }}">{{ emp.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button type="submit" class="leet-btn" style="background:#36b37e; color:#fff;">Save</button>
+            <button type="button" class="leet-btn modal-close-btn" style="background:#aaa; color:#222;" onclick="closeStatusModal()">Cancel</button>
+        </div>
+        </form>
+    </div>
+    </div>
+
+
+  </div>
+</div>
+
+<!-- Toast code (for success messages) -->
+<style>
+.toast-success {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    background: #36b37e;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        {% for category, message in messages %}
+          var toast = document.createElement('div');
+          toast.className = 'toast-success';
+          toast.innerText = "{{ message|escape }}";
+          document.body.appendChild(toast);
+          setTimeout(function() { toast.remove(); }, 2800);
+        {% endfor %}
+      });
+    </script>
+  {% endif %}
+{% endwith %}
+
+<script>
+document.getElementById('open-status-modal').onclick = function() {
+  document.getElementById('statusModal').style.display = 'flex';
+};
+function closeStatusModal(){
+  document.getElementById('statusModal').style.display = 'none';
+}
+// Live update remaining amount
+document.getElementById('statusUpdateForm').elements['paid_amount'].oninput = function(){
+  var total = parseInt({{ customer.amount_to_be_paid or 0 }});
+  var paid = parseInt(this.value) || 0;
+  var rem = total - paid;
+  document.getElementById('remaining-amount').value = rem >= 0 ? rem : 0;
+};
+</script>
+
+<script>
+document.getElementById('open-status-modal').onclick = function() {
+  document.getElementById('statusModal').style.display = 'flex';
+};
+function closeStatusModal(){
+  document.getElementById('statusModal').style.display = 'none';
+}
+
+// Live update remaining amount
+document.getElementById('paid-amount-input').oninput = function(){
+  var total = parseInt(document.getElementById('amount-to-be-paid').value) || 0;
+  var paid = parseInt(this.value) || 0;
+  var rem = total - paid;
+  document.getElementById('remaining-amount').value = rem >= 0 ? rem : 0;
+};
+</script>
+
+
+<script>
+document.getElementById('open-status-modal').onclick = function() {
+  document.getElementById('statusModal').style.display = 'flex';
+};
+function closeStatusModal(){
+  document.getElementById('statusModal').style.display = 'none';
+}
+document.getElementById('paid-amount-input').oninput = function(){
+  var total = parseInt(document.getElementById('amount-to-be-paid').value) || 0;
+  var paid = parseInt(this.value) || 0;
+  var rem = total - paid;
+  document.getElementById('remaining-amount').value = rem >= 0 ? rem : 0;
+};
+</script>
+
+
+{% endblock %}

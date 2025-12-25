@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Customers</h1>
+<div class="customers-header">
+    <div></div>
+    <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="window.location='/add_customer'">
+        <i class="fa fa-user-plus"></i> Add Customer
+    </button>
+</div>
+<div class="customers-table-wrap">
+    <table class="customers-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Package</th>
+                <th>Billing Date</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody class=customers-table-body>
+            {% for c in customers %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.type }}</td>
+                <td>{{ c.package.split('_')[1] if '_' in c.package else c.package }}</td>
+                <td>{{ c.billing_date.strftime('%Y-%m-%d') }}</td> 
+                <td>
+                    {% if c.status and c.status.lower() == 'active' %}
+                        <span class="status-badge status-active">{{ c.status }}</span>
+                    {% elif c.status and c.status.lower() == 'not paid' %}
+                        <span class="status-badge status-unpaid">{{ c.status }}</span>
+                    {% else %}
+                        <span class="status-badge status-inactive">{{ c.status or 'Inactive' }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('manage_customer', cnic=c.cnic) }}" class="manage-btn">Manage</a>
+                </td>
+            </tr>
+             {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center; padding:20px;">No customer found.</td>
+            </tr>
+            
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.toast-success {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    background: #36b37e;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        {% for category, message in messages %}
+          var toast = document.createElement('div');
+          toast.className = 'toast-success';
+          toast.innerText = "{{ message|escape }}";
+          document.body.appendChild(toast);
+          setTimeout(function() { toast.remove(); }, 2800);
+        {% endfor %}
+      });
+    </script>
+  {% endif %}
+{% endwith %}
+
+{% endblock %}
+
+

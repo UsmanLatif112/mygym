@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Manage Employee</h1>
+<div class="add-customer-full-bg">
+  <div class="add-customer-card customer-card">
+    <a href="{{ url_for('employees') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
+    <div class="customer-header">
+      <div>
+        <h2 class="customer-name">{{ employee.name }}</h2>
+        <div class="customer-membership">
+          Employee Status: 
+          {% if employee.status and employee.status|lower == 'active' %}
+            <span class="status-badge status-active">{{ employee.status }}</span>
+          {% elif employee.status and employee.status|lower == 'inactive' %}
+            <span class="status-badge status-inactive">{{ employee.status }}</span>
+          {% else %}
+            <span class="status-badge status-unpaid">{{ employee.status or 'No data found' }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="customer-actions-row">
+        <a href="{{ url_for('edit_employee', employee_id=employee.id) }}" class="sleet-btn">
+            <i class="fa fa-edit"></i> Edit
+        </a>
+        <a href="{{ url_for('delete_employee', employee_id=employee.id) }}" class="sleet-btn delete-btn">
+            <i class="fa fa-trash"></i> Delete
+        </a>
+      </div>
+    </div>
+    <hr class="customer-divider">
+    <div class="customer-info-grid">
+      <div><strong>Employment Type:</strong> <span>{{ employee.employment_type or 'No data found' }}</span></div>
+      <div><strong>Timing:</strong> <span>{{ employee.timing or 'No data found' }}</span></div>
+      <div><strong>Salary:</strong> <span>{{ employee.salary or 'No data found' }}</span></div>
+      <div><strong>Shift:</strong> <span>{{ employee.shift or 'No data found' }}</span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

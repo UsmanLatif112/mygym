@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% set hide_sidebar = True %}
+{% block content %}
+<div class="add-customer-full-bg">
+  <div class="add-customer-card">
+    <a href="{{ url_for('customers') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
+    <h1>Add Customer</h1>
+    <form method="POST" class="customer-form">
+        {{ form.hidden_tag() }}
+
+        <div class="form-block">
+            <label>Membership No:</label>
+            <span class="readonly-field">{{ membership_no }}</span>
+        </div>
+        <div class="form-block">
+            <label>Admission Date:</label>
+            <span class="readonly-field">{{ admission_date }}</span>
+        </div>
+
+        <div class="form-block">
+            <label for="name">Full Name:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.name(class_="form-input", id="name") }}
+            {% for error in form.name.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="father_or_husband">Father/Husband Name:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.father_or_husband(class_="form-input", id="father_or_husband") }}
+            {% for error in form.father_or_husband.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="cnic">CNIC:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.cnic(class_="form-input", id="cnic") }}
+            {% for error in form.cnic.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="email">Email:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.email(class_="form-input", id="email") }}
+            {% for error in form.email.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="gender">Gender:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.gender(class_="form-input", id="gender") }}
+            {% for error in form.gender.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="marital_status">Marital Status:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.marital_status(class_="form-input", id="marital_status") }}
+            {% for error in form.marital_status.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="blood_group">Blood Group:<span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            {{ form.blood_group(class_="form-input", id="blood_group") }}
+            {% for error in form.blood_group.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="dob">Date of Birth:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.dob(class_="form-input", id="dob", type="date") }}
+            {% for error in form.dob.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="height">Height (cm):<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.height(class_="form-input", id="height") }}
+            {% for error in form.height.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="weight">Weight (kg):<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.weight(class_="form-input", id="weight") }}
+            {% for error in form.weight.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="waist">Waist (cm):<span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            {{ form.waist(class_="form-input", id="waist") }}
+            {% for error in form.waist.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="profession">Profession:<span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            {{ form.profession(class_="form-input", id="profession") }}
+            {% for error in form.profession.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="nationality">Nationality:<span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            {{ form.nationality(class_="form-input", id="nationality") }}
+            {% for error in form.nationality.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="address">Address:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.address(class_="form-input textarea-nonresize", id="address") }}
+            {% for error in form.address.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="phone">Phone Number:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.phone(class_="form-input", id="phone") }}
+            {% for error in form.phone.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="emergency_contact">Emergency Contact No:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.emergency_contact(class_="form-input", id="emergency_contact") }}
+            {% for error in form.emergency_contact.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="package">Package:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.package(class_="form-input", id="package") }}
+            {% for error in form.package.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block" id="personal_training_time_row" style="display:none;">
+            <label for="personal_training_time">Preferred Training Time:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.personal_training_time(class_="form-input", id="personal_training_time") }}
+            {% for error in form.personal_training_time.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+            <label for="trainer">Trainer:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.trainer(class_="form-input", id="trainer") }}
+            {% for error in form.trainer.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="bmi_test">BMI Test:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.bmi_test(class_="form-input", id="bmi_test") }}
+            {% for error in form.bmi_test.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block" id="bmi_value_row" style="display:none;">
+            <label for="bmi_value">BMI Value:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.bmi_value(class_="form-input", id="bmi_value") }}
+            {% for error in form.bmi_value.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <a href="https://mygymlahore.com/bmi-calculator.html" target="_blank" style="color:#58a6ff;">Go to BMI Calculator</a>
+        </div>
+        <div class="form-block">
+            <label for="illnesses">Do you suffer from any of these illnesses?:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.illnesses(class_="form-input", id="illnesses") }}
+            {% for error in form.illnesses.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            <label for="join_reasons">Why do you want to join?:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.join_reasons(class_="form-input", id="join_reasons") }}
+            {% for error in form.join_reasons.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-blockcheck terms-row">
+            {{ form.terms_accepted() }} {{ form.terms_accepted.label }}
+            <a href="{{ url_for('terms') }}" target="_blank" style="color:#58a6ff;">Terms and Conditions</a>
+            {% for error in form.terms_accepted.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
+            {{ form.submit(class_='leet-btn') }}
+        </div>
+    </form>
+  </div>
+</div>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var illnessesWhitelist = [
+      "Diabetes", "Blood Pressure", "Heart Disease", "High Cholesterol", "Depression/Anxiety", "Asthma", "Arthritis", "Osteoporosis", "Thyroid Issues", "Back Pain"
+    ];
+    var joinReasonsWhitelist = [
+      "General Fitness", "Weight Reduction", "Dietary Advice", "Stress Management", "Sports Specific Exercise", "Body Building", "Weight Gain"
+    ];
+
+    // Illnesses
+    var illnessesInput = document.querySelector('#illnesses');
+    if (illnessesInput) {
+        new Tagify(illnessesInput, {
+            whitelist: illnessesWhitelist,
+            dropdown: {
+                maxItems: 20,
+                enabled: 0,
+                closeOnSelect: false
+            },
+            enforceWhitelist: false, // allows custom values
+        });
+    }
+
+    // Join Reasons
+    var joinReasonsInput = document.querySelector('#join_reasons');
+    if (joinReasonsInput) {
+        new Tagify(joinReasonsInput, {
+            whitelist: joinReasonsWhitelist,
+            dropdown: {
+                maxItems: 20,
+                enabled: 0,
+                closeOnSelect: false
+            },
+            enforceWhitelist: false,
+        });
+    }
+});
+</script>
+
+<script>
+  $(function() {
+    $('.select2').select2({ width: '100%' });
+
+    $('#package').on('change', function() {
+      if ($(this).val().startsWith('Personal')) {
+        $('#personal_training_time_row').show();
+      } else {
+        $('#personal_training_time_row').hide();
+      }
+    }).trigger('change');
+
+    $('select[name="bmi_test"]').on('change', function() {
+      if ($(this).val() === 'Yes') {
+        $('#bmi_value_row').show();
+      } else {
+        $('#bmi_value_row').hide();
+      }
+    }).trigger('change');
+
+    $('select[name="illnesses"]').on('change', function() {
+      if ($(this).val() && $(this).val().includes('Other')) {
+        $('#illness_other_row').show();
+      } else {
+        $('#illness_other_row').hide();
+      }
+    }).trigger('change');
+  });
+</script>
+
+<style>
+.toast-error {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    background: #d90429;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+{% if form.cnic.errors %}
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var toast = document.createElement('div');
+      toast.className = 'toast-error';
+      toast.innerText = "{{ form.cnic.errors[0]|escape }}";
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 2800);
+    });
+  </script>
+{% endif %}
+
+
+{% endblock %}
+
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  $(function() {
+    $('.select2').select2({ width: '100%' });
+  });
+
+  $(function() {
+    function toggleBMIValue() {
+        if ($('#bmi_test').val() === 'Yes') {
+            $('#bmi_value_row').show();
+        } else {
+            $('#bmi_value_row').hide();
+        }
+    }
+    $('#bmi_test').on('change', toggleBMIValue);
+    toggleBMIValue(); // set initial state
+  });
+</script>
+

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+
+    <title>My Gym | Shape it up</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+    {% if not hide_sidebar %}
+    <div class="sidebar">
+        <img src="{{ url_for('static', filename='logo.png') }}" class="logo-center"/>
+        {% if current_user.is_authenticated %}
+            <h3>Welcome, {{ current_user.username|capitalize }}</h3>
+        {% else %}
+            <h3>Welcome to My Gym</h3>
+        {% endif %}
+        <ul>
+            <li><a href="/"><i class="fa fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="/customers"><i class="fa fa-users"></i> Customers</a></li>
+        
+            {% if current_user.role_id == '1' %}
+                <li>
+                    <a href="{{ url_for('employees') }}">
+                        <i class="fa fa-users"></i> Employees
+                    </a>
+                </li>
+                {% endif %}
+            <li><a href="/billing"><i class="fa fa-file-invoice-dollar"></i> Billing</a></li>
+            <li><a href="/expenses"><i class="fa fa-wallet"></i> Expenses</a></li>
+            <li><a href="/attendance"><i class="fa fa-fingerprint"></i> Attendance</a></li>
+            <li><a href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </div>
+    {% endif %}
+    <div class="main-content{% if hide_sidebar %} no-sidebar{% endif %}">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

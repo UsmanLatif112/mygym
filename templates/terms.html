@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set hide_sidebar = True %}
+{% block content %}
+<div class="add-customer-full-bg">
+  <div class="add-customer-card" style="max-width: 640px; background: #222;">
+    <a href="{{ url_for('add_customer') }}" class="back-btn">
+      <i class="fa fa-arrow-left"></i> Back
+    </a>
+    <h1 style="margin-bottom:18px; color: #ff7300; font-weight: bold;">Rules & Regulations</h1>
+    <p style="margin-top:20px; margin-bottom:16px; font-weight:800; color:#fff; text-align:center;">
+    Membership is subject to approval by the management committee.
+    <span style="display:block; margin-top:6px; color:#fff;">
+        Membership card must be presented upon entering the facilities.
+    </span>
+    </p>
+
+    <ul style="margin-left:0; padding-left:18px; font-size:1.05em; color:#fff;">
+      <li style="margin-bottom:10px;">Smoking, alcoholic drinks and drugs are strictly prohibited.</li>
+      <li style="margin-bottom:10px;">Abusive language or uncivilized behaviour is not allowed.</li>
+      <li style="margin-bottom:10px;">All disputes to be decided by club management and its decision will be final and acceptable to all the members.</li>
+      <li style="margin-bottom:10px;">Club property not to be removed from the premises without the written permission of the management.</li>
+      <li style="margin-bottom:10px;">Any damage caused to the club property to be paid at the replacement cost decided by the management.</li>
+      <li style="margin-bottom:10px;">All personal belongings brought to the premises are at the owner's risk who will be responsible for their safe keeping.</li>
+      <li style="margin-bottom:10px;">Club management reserves the right to cancel any membership without giving any reason.</li>
+      <li style="margin-bottom:10px;">Members are required to deposit dues within three days of expiry date. Thereafter new admission fee will be charged.</li>
+      <li style="margin-bottom:10px;">All exercises are done at members' own risk. Management is not liable for any injury caused without instruction.</li>
+      <li style="margin-bottom:10px;">Members are advised to get doctor clearance before starting any exercise program. MY GYM management is not liable for any change in condition of health.</li>
+      <li style="margin-bottom:10px;">All dues paid are non-refundable and non-transferable.</li>
+      <li style="margin-bottom:10px;">No allowance will be made in lieu of absence.</li>
+      <li style="margin-bottom:10px;">Exercise in shalwar qameez is not allowed.</li>
+    </ul>
+    <div style="margin-top:16px; font-size:1em; color:#fff;">
+      <b>Note:</b> Management reserves the right to add, amend or delete any of the rules without prior notice.
+    </div>
+  </div>
+</div>
+{% endblock %}
