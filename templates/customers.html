@@ -1,17 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Customers</h1>
-<div class="customers-header">
-    <div></div>
-    <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="window.location='/add_customer'">
+<div class="customers-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px;">
+    <form method="get" action="{{ url_for('customers') }}" class="customers-search-form" style="flex: 1; max-width: 250px;">
+        <input 
+            type="text" 
+            name="q" 
+            placeholder="Search by name, membership, phone, or CNIC..." 
+            value="{{ request.args.get('q', '') }}"
+            class="form-input search-input"
+            autocomplete="off"
+            style="width: 100%;"
+        >
+    </form>
+    <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em; margin-left: 22px;" onclick="window.location='/add_customer'">
         <i class="fa fa-user-plus"></i> Add Customer
     </button>
 </div>
+
+
+
+
 <div class="customers-table-wrap">
     <table class="customers-table">
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Membership#</th>
                 <th>Type</th>
                 <th>Package</th>
                 <th>Billing Date</th>
@@ -29,6 +44,7 @@
                         {{ c.name }}
                     {% endif %}
                 </td>
+                <td>{{ c.membership_no }}</td>
                 <td>{{ c.type }}</td>
                 <td>{{ c.package.split('_')[1] if '_' in c.package else c.package }}</td>
                 <td>{{ c.billing_date.strftime('%Y-%m-%d') }}</td> 
@@ -92,6 +108,13 @@
     </script>
   {% endif %}
 {% endwith %}
+
+<script>
+document.getElementById('customers-live-search').addEventListener('input', function() {
+    // Submit the form automatically whenever the input changes
+    this.form.submit();
+});
+</script>
 
 {% endblock %}
 

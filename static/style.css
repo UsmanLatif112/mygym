@@ -49,7 +49,7 @@ body {
     font-weight: 600;
     padding: 14px 0;
     width: 100%;
-    margin-top: 14px;
+    margin-top: 0px;
     border-radius: 7px;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(255,115,0,0.13);
@@ -87,6 +87,7 @@ body {
     font-size: 0.98em;
     opacity: 0.88;
 }
+
 
 .sidebar {
     position: fixed;
@@ -611,7 +612,7 @@ body, .main-content, .login-container {
   width: 100%;
   border-radius: 7px;
   cursor: pointer;
-  margin-top: 12px;
+  margin-top: 0px;
   box-shadow: 0 2px 8px rgba(255,115,0,0.13);
   letter-spacing: 0.5px;
   transition: background 0.15s, color 0.15s;
@@ -1003,4 +1004,37 @@ select.form-input {
     padding: 7px 8px;
     font-size: 0.99em;
     vertical-align: middle;
+}
+
+
+
+
+
+
+
+
+.customers-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 26px;
+    gap: 18px;
+}
+.customers-search-form {
+    flex: 1;
+    max-width: 400px;
+}
+.search-input {
+    height: 41px;
+    font-size: 1em;
+    background: #181818;
+    color: #ffb347;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    padding: 0 14px;
+    width: 100%;
+}
+.leet-btn {
+    height: 41px;
+    font-size: 1.08em;
 }

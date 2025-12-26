@@ -134,7 +134,18 @@ def login():
 @app.route('/customers')
 @login_required
 def customers():
-    customers_list = Customer.query.all()
+    q = request.args.get('q', '').strip()
+    query = Customer.query
+    if q:
+        query = query.filter(
+            db.or_(
+                Customer.name.ilike(f"%{q}%"),
+                Customer.membership_no.ilike(f"%{q}%"),
+                Customer.cnic.ilike(f"%{q}%"),
+                Customer.phone.ilike(f"%{q}%")
+            )
+        )
+    customers_list = query.all()
     from flask import get_flashed_messages
     messages = get_flashed_messages(with_categories=True)
     print("Flashed messages:", messages)   # <-- See in terminal
