@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Accounts Summary</h1>
+
+<div class="accounts-filter-bar">
+    <form method="get" id="accounts-filter-form" style="display: flex; gap: 12px; align-items: center;">
+        <select name="period" id="period-select" class="form-input filter-select">
+            <option value="1m" {% if period=='1m' %}selected{% endif %}>Last 1 Month</option>
+            <option value="2m" {% if period=='2m' %}selected{% endif %}>Last 2 Months</option>
+            <option value="6m" {% if period=='6m' %}selected{% endif %}>Last 6 Months</option>
+            <option value="1y" {% if period=='1y' %}selected{% endif %}>Last 1 Year</option>
+            <option value="custom" {% if period=='custom' %}selected{% endif %}>Custom</option>
+        </select>
+        <div id="custom-range-fields" style="display: {% if period=='custom' %}flex{% else %}none{% endif %}; gap: 7px;">
+            <input type="date" name="start" value="{{ custom_start or '' }}" class="form-input filter-date">
+            <input type="date" name="end" value="{{ custom_end or '' }}" class="form-input filter-date">
+        </div>
+        <button type="submit" class="leett-btn">Apply</button>
+    </form>
+</div>
+
+<div class="accounts-cards">
+    <div class="account-card">
+        <span>Active Customers</span>
+        <span class="number">{{ active_customers }}</span>
+    </div>
+    <div class="account-card">
+        <span>Active Trainers</span>
+        <span class="number">{{ active_trainers }}</span>
+    </div>
+    <div class="account-card">
+        <span>Total Sale</span>
+        <span class="number">{{ total_sale }}</span>
+    </div>
+    <div class="account-card">
+        <span>Total PT Customers</span>
+        <span class="number">{{ pt_customers }}</span>
+    </div>
+    <div class="account-card">
+        <span>Total Expense</span>
+        <span class="number">{{ total_expense }}</span>
+    </div>
+    <div class="account-card">
+        <span>Total Salary</span>
+        <span class="number">{{ total_salary }}</span>
+    </div>
+    <div class="account-card">
+        <span>Profit</span>
+        <span class="number" style="color: {{ 'limegreen' if profit >= 0 else '#ffb347' }};">{{ profit }}</span>
+    </div>
+    <div class="account-card">
+        <span>Online Payments</span>
+        <span class="number">{{ online_payments }}</span>
+    </div>
+    <div class="account-card">
+        <span>Cash Payments</span>
+        <span class="number">{{ cash_payments }}</span>
+    </div>
+    <div class="account-card">
+        <span>Total Remain</span>
+        <span class="number">{{ total_remain }}</span>
+    </div>
+    <div class="account-card">
+        <span>Customers in Debt</span>
+        <span class="number">{{ remain_customers }}</span>
+    </div>
+    <div class="account-card">
+        <span>Cash in Hand</span>
+        <span class="number">{{ cash_in_hand }}</span>
+    </div>
+</div>
+
+<style>
+.accounts-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-bottom: 32px;
+    justify-content: flex-start;
+}
+.account-card {
+    background: #232323;
+    color: #ffb347;
+    border-radius: 12px;
+    padding: 22px 28px;
+    min-width: 220px;
+    flex: 1 1 220px;
+    font-size: 1.13em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 18px #0003;
+    margin-bottom: 6px;
+    border: 1px solid #222;
+    transition: transform 0.15s;
+}
+.account-card:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 8px 24px #0005;
+}
+.account-card .number {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.23em;
+    margin-left: 14px;
+    letter-spacing: 0.5px;
+}
+</style>
+
+
+<script>
+document.getElementById('period-select').addEventListener('change', function() {
+    document.getElementById('custom-range-fields').style.display = (this.value === 'custom') ? 'flex' : 'none';
+});
+</script>
+
+
+{% endblock %}

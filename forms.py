@@ -83,14 +83,15 @@ class EmployeeForm(FlaskForm):
                 raise ValidationError('CNIC without dashes must be 13 digits.')
             if not cnic.isdigit():
                 raise ValidationError('CNIC without dashes must be all digits.')
-        # Uniqueness check in Employee table
-        existing = Employee.query.filter_by(cnic=cnic).first()
-        # Only raise error if the CNIC belongs to a different employee (for edit support)
-        if existing and (not hasattr(self, '_current_employee') or existing.id != self._current_employee.id):
-            raise ValidationError('This employee already exists.')
+        # Uniqueness check only if ADDING, NOT editing
+        if not hasattr(self, '_current_employee'):  # Only add this check when adding
+            existing = Employee.query.filter_by(cnic=cnic).first()
+            if existing:
+                raise ValidationError('This employee already exists.')
 
     employment_type = SelectField('Employment Type', choices=[('Owner', 'Owner'), ('Trainer', 'Trainer'), ('Office Boy', 'Office Boy')], validators=[DataRequired()])
     timing = StringField('Timing')
+    phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11, max=14)])
     shift = SelectField('Shift', choices=[('Morning', 'Morning'), ('Evening', 'Evening'), ('Night', 'Night')], validators=[DataRequired()])
     salary = FloatField('Salary')
     status = SelectField('Status', choices=[('Active', 'Active'), ('Inactive', 'Inactive')], validators=[DataRequired()])

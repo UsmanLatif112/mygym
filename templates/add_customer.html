@@ -137,17 +137,30 @@
             {% endfor %}
         </div>
         <div class="form-block" id="personal_training_time_row" style="display:none;">
-            <label for="personal_training_time">Preferred Training Time:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.personal_training_time(class_="form-input", id="personal_training_time") }}
-            {% for error in form.personal_training_time.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-            <label for="trainer">Trainer:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.trainer(class_="form-input", id="trainer") }}
+            <label for="trainer">Trainer<span style="font-weight:400; color:#FF0000;">*</span></label>
+            <select name="trainer" class="form-input" id="trainer">
+                <option value="">Select Trainer</option>
+                {% for t in trainers %}
+                    <option value="{{ t.name }}"
+                        data-timing="{{ t.timing or '' }}"
+                        {% if form.trainer.data == t.name %}selected{% endif %}
+                    >{{ t.name }}</option>
+                {% endfor %}
+            </select>
             {% for error in form.trainer.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
+
+            <label for="personal_training_time">Preferred Training Time</label>
+            {{ form.personal_training_time(class_="form-input", id="personal_training_time", readonly=True) }}
+            {% for error in form.personal_training_time.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
         </div>
+
+
+
+
         <div class="form-block">
             <label for="bmi_test">BMI Test:<span style="font-weight:400; color:#FF0000;">*</span></label>
             {{ form.bmi_test(class_="form-input", id="bmi_test") }}
@@ -197,6 +210,26 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
 <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var trainerSelect = document.getElementById('trainer');
+    var timeInput = document.getElementById('personal_training_time');
+
+    function syncTime() {
+        var selectedOption = trainerSelect.options[trainerSelect.selectedIndex];
+        var timing = selectedOption ? selectedOption.getAttribute('data-timing') : '';
+        timeInput.value = timing || '';
+    }
+
+    trainerSelect.addEventListener('change', syncTime);
+
+    // Sync on page load (for edit form)
+    syncTime();
+});
+</script>
+
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

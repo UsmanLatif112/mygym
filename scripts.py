@@ -6,9 +6,9 @@
 #     db.create_all()  # Ensure tables exist
 
 #     # Change these values as you wish
-#     username = 'admin2'
+#     username = 'admin2fbjhmkmbjhcfgdcfgbjhklljghfdfhjkhdfghjkhgfdghjkhgf'
 #     password = 'admin123'
-#     role_id = 2
+#     role_id = 1
 
 #     if not User.query.filter_by(username=username).first():
 #         user = User(username=username, role_id=role_id)
@@ -20,31 +20,31 @@
 #         print('User already exists.')
 
 
-# from app import app, db
-
-# # Make sure this matches your new Billing model!
-# from models import Employee
-
-# with app.app_context():
-#     # Drop the existing 'billing' table if it exists
-#     Employee.__table__.drop(db.engine, checkfirst=True)
-#     print("Dropped existing 'billing' table (if it existed).")
-
-#     # Recreate the new 'billing' table
-#     db.create_all()
-#     print("Created new 'billing' table with updated schema.")
-
 from app import app, db
-from models import Employee
+
+# Make sure this matches your new Billing model!
+from models import SalaryHistory
 
 with app.app_context():
-    # Drop the existing employee table if it exists
-    Employee.__table__.drop(db.engine, checkfirst=True)
-    print("Dropped existing employee table.")
+    # Drop the existing 'billing' table if it exists
+    SalaryHistory.__table__.drop(db.engine, checkfirst=True)
+    print("Dropped existing 'billing' table (if it existed).")
 
-    # Recreate the employee table with the current model
+    # Recreate the new 'billing' table
     db.create_all()
-    print("Created new employee table with updated schema.")
+    print("Created new 'billing' table with updated schema.")
+
+# from app import app, db
+# from models import Billing
+
+# with app.app_context():
+#     # Drop the existing employee table if it exists
+#     Billing.__table__.drop(db.engine, checkfirst=True)
+#     print("Dropped existing Billing table.")
+
+#     # Recreate the Billing table with the current model
+#     db.create_all()
+#     print("Created new Billing table with updated schema.")
 
 # from app import app, db
 # from models import Customer

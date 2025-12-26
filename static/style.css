@@ -61,6 +61,26 @@ body {
     color: #111;
     box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
+.leett-btn {
+    background: linear-gradient(90deg, #ff7300, #ffb347 70%);
+    color: #181818;
+    border: none;
+    font-size: 1.01em;
+    font-weight: 600;
+    padding: 14px 0;
+    width: 150px;
+    height: 40px;
+    border-radius: 7px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(255,115,0,0.13);
+    letter-spacing: 0.5px;
+    transition: background 0.15s, color 0.15s;
+}
+.leett-btn:hover {
+    background: linear-gradient(90deg, #ffb347, #ff7300 70%);
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
+}
 .attendance-thumb {
     margin-top: 22px;
     color: #ff7300;
@@ -84,11 +104,134 @@ body {
 }
 .logo-center {
     display: block;
-    margin: 0 auto 22px auto;
+    margin: 0 auto 18px auto;
     max-width: 90px;
     /* border-radius: 12px;
     box-shadow: 0 2px 12px #ff730040; */
 }
+
+.accounts-filter-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 30px;
+    min-height: 48px;
+    width: 100%;
+}
+
+#accounts-filter-form {
+    background: #232323;
+    border-radius: 8px;
+    padding: 8px 18px;
+    box-shadow: 0 2px 8px #0002;
+    gap: 12px;
+}
+
+/* Match filter fields and button height to cards */
+.filter-select, .filter-date, .filter-apply-btn {
+    height: 45px;
+    font-size: 1em;
+}
+
+.filter-select, .filter-date {
+    background: #181818;
+    color: #ffb347;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    padding: 0 14px;
+}
+
+.filter-date {
+    min-width: 130px;
+}
+
+.filter-apply-btn {
+    background: #ff7300;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0 20px;
+    transition: background 0.2s;
+}
+
+.filter-apply-btn:hover {
+    background: #ffb347;
+    color: #232323;
+}
+
+.accounts-filter-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 30px;
+    min-height: 48px;
+    width: 100%;
+}
+
+.accounts-filter-form {
+    background: #232323;
+    border-radius: 8px;
+    padding: 8px 18px;
+    box-shadow: 0 2px 8px #0002;
+    gap: 14px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-label {
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.11em;
+    margin-right: 3px;
+    letter-spacing: 0.3px;
+    min-width: 56px;
+}
+
+.filter-select, .filter-date, .filter-apply-btn {
+    height: 41px;
+    font-size: 1.08em;
+    line-height: 41px;
+    min-width: 150px;
+}
+
+.filter-select {
+    background: #181818;
+    color: #ffb347;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    padding: 0 14px;
+    min-width: 180px;
+    max-width: 220px;
+}
+
+.filter-date {
+    background: #181818;
+    color: #ffb347;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    padding: 0 14px;
+    min-width: 150px;
+    max-width: 190px;
+}
+
+.filter-apply-btn {
+    background: #ff7300;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0 26px;
+    font-size: 1.08em;
+    font-weight: 600;
+    transition: background 0.2s;
+    letter-spacing: 0.5px;
+}
+
+.filter-apply-btn:hover {
+    background: #ffb347;
+    color: #232323;
+}
+
 
 .main-content.no-sidebar {
     margin-left: 0 !important;
@@ -220,8 +363,65 @@ body, .main-content, .login-container {
     border-collapse: collapse;
     color: #fff;
     background: transparent;
-    font-size: 0.90em;
+    font-size: 0.99em;
 }
+
+.customers-table td span[title] {
+    cursor: pointer;
+    text-decoration: underline dotted #ffb347;
+}
+.customer-name[title] {
+    cursor: pointer;
+    text-decoration: underline dotted #ffb347;
+}
+.customers-table th, .customers-table td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+}
+.info-table th, .info-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #222;
+    font-size: 1em;
+}
+.info-table th {
+    color: #ffb347;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    background: #181818;
+}
+.info-table td {
+    color: #fff;
+    background: #222;
+}
+
+.customers-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #181818;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.customers-table th, .customers-table td {
+    padding: 14px 10px;
+    text-align: center;
+    border-bottom: 1px solid #232323;
+    font-size: 1em;
+}
+
+.customers-table th {
+    background: #232323;
+    color: #ffb347;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #ff7300;
+}
+
+.customers-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
 
 .customers-table th, .customers-table td {
     padding: 14px 18px;
@@ -706,10 +906,10 @@ select.form-input {
   color: #fff;
   width: 350px;
 }
-.form-group { margin-bottom: 18px; }
+.form-group { margin-bottom: 3px; }
 .form-group label { display:block; font-weight:600; margin-bottom:5px; color:#ff7300; }
 .form-group input { width:100%; padding:7px 10px; border-radius:6px; border:1px solid #444; background:#181a1b; color:#fff; }
-.modal-actions { display:flex; gap: 12px; justify-content:flex-end; margin-top:18px;}
+.modal-actions { display:flex; gap: 12px; justify-content:flex-end;}
 
 .customer-actions-row {
   display: flex;
@@ -766,11 +966,41 @@ select.form-input {
 
 .modal-content {
     background: #23272f;
-    padding: 32px 24px;
+    padding: 15px 24px;
     border-radius: 12px;
     box-shadow: 0 8px 32px #0006;
     min-width: 320px;
     max-width: 95vw;
     color: #ff7300;
     font-size: 0.80em;
+}
+
+
+/* Consistent spacing for all modal form fields */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="date"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 20px;   /* Add right padding */
+    padding-left: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 1em;
+    border-radius: 5px;
+    border: 1px solid #444;
+    background: #181a1b;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+
+
+.customers-table th, .customers-table td {
+    padding: 7px 8px;
+    font-size: 0.99em;
+    vertical-align: middle;
 }

@@ -19,4 +19,41 @@
         </div>
     </form>
 </div>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        {% for category, message in messages %}
+          var toast = document.createElement('div');
+          toast.className = 'toast-{{ category }}';
+          toast.innerText = "{{ message|escape }}";
+          document.body.appendChild(toast);
+          setTimeout(function() { toast.remove(); }, 2800);
+        {% endfor %}
+      });
+    </script>
+  {% endif %}
+{% endwith %}
+
+<style>
+.toast-error {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 220px;
+    background: #d90429;
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+
+
 {% endblock %}

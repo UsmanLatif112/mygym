@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 18px;">Expenses</h1>
+<div style="font-size: 1.1em; margin-bottom: 10px; color: #fff;">
+    Total Expense: <span style="color:#ffb347; font-weight:600;">{{ total_expense }}</span>
+</div>
+ 
+<div style="text-align: right; margin-bottom: 24px;">
+  <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="openAddExpenseModal()">
+      <i class="fa fa-plus"></i> Add Expense
+  </button>
+</div>
+<div class="customers-table-wrap">
+    <table class="customers-table" style="font-size: 0.99em;">
+        <thead>
+            <tr>
+                <th>Expense Name</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Paid By</th>
+                <th>Method</th>
+                <th>Tr. ID</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in expenses %}
+            <tr>
+                <td>{{ e.name }}</td>
+                <td>
+                    {% if e.description and e.description|length > 20 %}
+                        <span title="{{ e.description }}">{{ e.description[:20] }}&hellip;</span>
+                    {% else %}
+                        {{ e.description }}
+                    {% endif %}
+                </td>
+                <td>{{ e.amount }}</td>
+                <td>{{ e.paid_by }}</td>
+                <td>{{ e.payment_method }}</td>
+                <td>
+                    {% if e.payment_method == 'Online' and e.transaction_id %}
+                        {{ e.transaction_id }}
+                    {% else %}
+                        <span style="color:#aaa;">None</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_expense', expense_id=e.id) }}" style="display:inline;">
+                        <button type="submit" class="leet-btn delete-btn" style="padding: 6px 16px; font-size:0.92em;">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align:center;">No expenses found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Expense Modal -->
+<div id="addExpenseModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:400px;">
+    <h2>Add Expense</h2>
+    <form method="POST" action="{{ url_for('add_expense') }}">
+      <div class="form-block">
+        <label>Expense Name:</label>
+        <input type="text" name="name" class="form-input" required>
+      </div>
+      <div class="form-block">
+        <label>Description:</label>
+        <input type="text" name="description" class="form-input">
+      </div>
+      <div class="form-block">
+        <label>Amount:</label>
+        <input type="number" min="0" step="1" name="amount" class="form-input" required>
+      </div>
+      <div class="form-block">
+        <label>Paid By:</label>
+        <select name="paid_by" class="form-input" required>
+            <option value="">Select Employee</option>
+            {% for emp in employees %}
+                <option value="{{ emp.name }}">{{ emp.name }}</option>
+            {% endfor %}
+        </select>
+      </div>
+      <div class="form-block">
+        <label>Payment Method:</label>
+        <select name="payment_method" class="form-input" id="expense_payment_method" required>
+          <option value="">Select Method</option>
+          <option value="Cash">Cash</option>
+          <option value="Online">Online</option>
+        </select>
+      </div>
+      <div class="form-block" id="expense_transaction_id_row" style="display:none;">
+        <label>Transaction ID:</label>
+        <input type="text" name="transaction_id" id="expense_transaction_id" class="form-input">
+      </div>
+      <div class="form-block" style="display: flex; gap: 10px;">
+        <button type="submit" class="leet-btn">Save Expense</button>
+        <button type="button" class="leet-btn modal-close-btn" onclick="closeAddExpenseModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAddExpenseModal() {
+    document.getElementById('addExpenseModal').style.display = 'flex';
+}
+function closeAddExpenseModal() {
+    document.getElementById('addExpenseModal').style.display = 'none';
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var paymentMethod = document.getElementById('expense_payment_method');
+    var transactionRow = document.getElementById('expense_transaction_id_row');
+    if (paymentMethod) {
+      paymentMethod.addEventListener('change', function() {
+          if (paymentMethod.value === 'Online') {
+              transactionRow.style.display = 'block';
+          } else {
+              transactionRow.style.display = 'none';
+              document.getElementById('expense_transaction_id').value = '';
+          }
+      });
+    }
+});
+</script>
+
+<!-- Toast messages (reuse your toast block from other pages) -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        {% for category, message in messages %}
+          var toast = document.createElement('div');
+          toast.className = 'toast-{{ category }}';
+          toast.innerText = "{{ message|escape }}";
+          document.body.appendChild(toast);
+          setTimeout(function() { toast.remove(); }, 2800);
+        {% endfor %}
+      });
+    </script>
+  {% endif %}
+{% endwith %}
+
+{% endblock %}

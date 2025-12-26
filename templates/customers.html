@@ -22,7 +22,13 @@
         <tbody class=customers-table-body>
             {% for c in customers %}
             <tr>
-                <td>{{ c.name }}</td>
+                <td>
+                    {% if c.name and c.name|length > 20 %}
+                        <span title="{{ c.name }}">{{ c.name[:20] }}&hellip;</span>
+                    {% else %}
+                        {{ c.name }}
+                    {% endif %}
+                </td>
                 <td>{{ c.type }}</td>
                 <td>{{ c.package.split('_')[1] if '_' in c.package else c.package }}</td>
                 <td>{{ c.billing_date.strftime('%Y-%m-%d') }}</td> 

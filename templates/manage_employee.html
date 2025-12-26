@@ -6,7 +6,12 @@
     <a href="{{ url_for('employees') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
     <div class="customer-header">
       <div>
-        <h2 class="customer-name">{{ employee.name }}</h2>
+        
+        {% if employee.name|length > 12 %}
+          <h2 class="customer-name" title="{{ employee.name }}">{{ employee.name[:12] }}&hellip;</h2>
+        {% else %}
+          <h2 class="customer-name">{{ employee.name }}</h2>
+        {% endif %}
         <div class="customer-membership">
           Employee Status: 
           {% if employee.status and employee.status|lower == 'active' %}
@@ -19,21 +24,327 @@
         </div>
       </div>
       <div class="customer-actions-row">
-        <a href="{{ url_for('edit_employee', employee_id=employee.id) }}" class="sleet-btn">
+        <button class="sleet-btn" type="button" onclick="openEditEmployeeModal()">
             <i class="fa fa-edit"></i> Edit
-        </a>
+        </button>
         <a href="{{ url_for('delete_employee', employee_id=employee.id) }}" class="sleet-btn delete-btn">
             <i class="fa fa-trash"></i> Delete
         </a>
       </div>
     </div>
     <hr class="customer-divider">
-    <div class="customer-info-grid">
-      <div><strong>Employment Type:</strong> <span>{{ employee.employment_type or 'No data found' }}</span></div>
-      <div><strong>Timing:</strong> <span>{{ employee.timing or 'No data found' }}</span></div>
-      <div><strong>Salary:</strong> <span>{{ employee.salary or 'No data found' }}</span></div>
-      <div><strong>Shift:</strong> <span>{{ employee.shift or 'No data found' }}</span></div>
-    </div>
+    <div class="customers-table-wrap">
+    <table class="customers-table" style="font-size: 0.97em;margin-bottom: 1px;">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Phone </th>
+                <th>Salary</th>
+                <th>Timing</th>
+                <th>CNIC</th>
+                <th>Shift</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ employee.employment_type or 'No data found' }}</td>
+                <td>{{ employee.phone_number or 'No data found' }}</td>
+                <td>{{ employee.salary or 'No data found' }}</td>
+                <td>{{ employee.timing or 'No data found' }}</td>
+                <td>{{ employee.cnic or 'No data found' }}</td>
+                <td>{{ employee.shift or 'No data found' }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+    <hr class="customer-divider" style="margin-top: 32px;">
+
+<h2 style="color:#ff7300; letter-spacing:1px; margin-top: 5px; margin-bottom: 5px;">
+    Salary History
+</h2>
+{% if total_advance > 0 %}
+<div style="font-size: 0.90em; color: #ffb347; font-weight:600; margin: 5px 0 26px;">
+    Total Advance Paid: {{ total_advance }}
+</div>
+{% endif %}
+<div style="text-align: right; margin-bottom: 18px;">
+  <button class="leet-btn" style="width:auto; padding:10px 22px; font-size:1em;" onclick="openPaySalaryModal()">
+      <i class="fa fa-plus"></i> Pay Salary
+  </button>
+</div>
+<div class="customers-table-wrap">
+    <table class="customers-table" style="font-size: 0.97em;">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th>Tr. ID</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in salary_history %}
+            <tr>
+                <td>{{ s.transaction_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ s.salary_amount }}</td>
+                <td>{{ s.payment_type }}</td>
+                <td>{{ s.payment_method }}</td>
+                <td>
+                    {% if s.payment_method == 'Online' and s.transaction_id %}
+                        {{ s.transaction_id }}
+                    {% else %}
+                        <span style="color:#aaa;">None</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center;">No salary records found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
   </div>
 </div>
+
+<!-- Modal structure (can be hidden/shown with JS) -->
+<div id="editEmployeeModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content">
+    <h2 style="margin-top: 1px;">Edit Employee</h2>
+    <form id="editEmployeeForm" method="POST" action="{{ url_for('edit_employee_by_cnic', cnic=employee.cnic) }}">
+
+      {{ form.hidden_tag() }}
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="name">Employee Name:</label>
+        {{ form.name(class_="form-input", id="edit-name") }}
+        {% for error in form.name.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="cnic">Employee CNIC:</label>
+        {{ form.cnic(class_="form-input", id="edit-cnic", readonly=True) }}
+        {% for error in form.cnic.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="employment_type">Employment Type:</label>
+        {{ form.employment_type(class_="form-input", id="edit-employment_type") }}
+        {% for error in form.employment_type.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="phone_number">Phone Number:</label>
+        {{ form.phone_number(class_="form-input", id="edit-phone_number") }}
+        {% for error in form.phone_number.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="salary">Salary:</label>
+        {{ form.salary(class_="form-input", id="edit-salary") }}
+        {% for error in form.salary.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="timing">Timing:</label>
+        {{ form.timing(class_="form-input", id="edit-timing") }}
+        {% for error in form.timing.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="shift">Shift:</label>
+        {{ form.shift(class_="form-input", id="edit-shift") }}
+        {% for error in form.shift.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="status">Status:</label>
+        {{ form.status(class_="form-input", id="edit-status") }}
+        {% for error in form.status.errors %}
+        <span class="form-error">{{ error }}</span>
+        {% endfor %}
+      </div>
+      <div class="form-block" style="display: flex; gap: 10px;">
+        <button type="submit" class="leet-btn" style="background:#ff7300; color:#fff;">Save Changes</button>
+        <button type="button" class="leet-btn modal-close-btn" onclick="closeEditEmployeeModal()" style="background:#181818; color:#fff;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditEmployeeModal() {
+    const modal = document.getElementById('editEmployeeModal');
+    document.getElementById('edit-name').value = {{ employee.name|tojson }};
+    document.getElementById('edit-cnic').value = {{ employee.cnic|tojson }};
+    document.getElementById('edit-employment_type').value = {{ employee.employment_type|tojson }};
+    document.getElementById('edit-phone_number').value = {{ employee.phone_number|tojson }};
+    document.getElementById('edit-salary').value = {{ employee.salary|tojson }};
+    document.getElementById('edit-timing').value = {{ employee.timing|tojson }};
+    document.getElementById('edit-shift').value = {{ employee.shift|tojson }};
+    document.getElementById('edit-status').value = {{ employee.status|tojson }};
+
+    modal.style.display = 'flex';
+}
+function closeEditEmployeeModal() {
+    document.getElementById('editEmployeeModal').style.display = 'none';
+}
+</script>
+
+
+<style>
+.toast-error {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    background: #d90429;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+{% if form.cnic.errors %}
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var toast = document.createElement('div');
+      toast.className = 'toast-error';
+      toast.innerText = "{{ form.cnic.errors[0]|escape }}";
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 2800);
+    });
+  </script>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cnicInput = document.getElementById('cnic');
+    const cnicError = document.createElement('span');
+    cnicError.className = 'form-error';
+    cnicInput.parentNode.appendChild(cnicError);
+
+    cnicInput.addEventListener('input', function() {
+        const cnic = cnicInput.value.trim();
+        if (!cnic) {
+            cnicError.textContent = '';
+            return;
+        }
+        // Send AJAX POST to check CNIC
+        fetch('{{ url_for("check_employee_cnic") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'cnic=' + encodeURIComponent(cnic)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                cnicError.textContent = 'This employee CNIC already exists.';
+            } else {
+                cnicError.textContent = '';
+            }
+        });
+    });
+});
+</script>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        {% for category, message in messages %}
+          var toast = document.createElement('div');
+          toast.className = 'toast-success';
+          toast.innerText = "{{ message|escape }}";
+          document.body.appendChild(toast);
+          setTimeout(function() { toast.remove(); }, 2800);
+        {% endfor %}
+      });
+    </script>
+  {% endif %}
+{% endwith %}
+
+
+<div id="paySalaryModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:400px;">
+    <h2>Pay Salary</h2>
+    <form method="POST" action="{{ url_for('pay_salary', employee_id=employee.id) }}">
+      <div class="form-block">
+        <label>Employee Name:</label>
+        <input type="text" value="{{ employee.name }}" readonly class="form-input">
+      </div>
+      <div class="form-block">
+        <label>Salary Amount:</label>
+        <input type="number" min="0" step="1" name="salary_amount" class="form-input" value="{{ employee.salary or '' }}" required>
+      </div>
+      <div class="form-block">
+        <label>Payment Type:</label>
+        <select name="payment_type" class="form-input" required>
+          <option value="Salary">Salary</option>
+          <option value="Advance">Advance</option>
+        </select>
+      </div>
+      <div class="form-block">
+        <label>Payment Method:</label>
+        <select name="payment_method" class="form-input" id="salary_payment_method" required>
+          <option value="">Select Method</option>
+          <option value="Cash">Cash</option>
+          <option value="Online">Online</option>
+        </select>
+      </div>
+      <div class="form-block" id="salary_transaction_id_row" style="display:none;">
+        <label>Transaction ID:</label>
+        <input type="text" name="transaction_id" id="salary_transaction_id" class="form-input">
+      </div>
+      <div class="form-block" style="display: flex; gap: 10px;">
+        <button type="submit" class="leet-btn">Save</button>
+        <button type="button" class="leet-btn modal-close-btn" onclick="closePaySalaryModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<script>
+function openPaySalaryModal() {
+    document.getElementById('paySalaryModal').style.display = 'flex';
+}
+function closePaySalaryModal() {
+    document.getElementById('paySalaryModal').style.display = 'none';
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var paymentMethod = document.getElementById('salary_payment_method');
+    var transactionRow = document.getElementById('salary_transaction_id_row');
+    if (paymentMethod) {
+      paymentMethod.addEventListener('change', function() {
+          if (paymentMethod.value === 'Online') {
+              transactionRow.style.display = 'block';
+          } else {
+              transactionRow.style.display = 'none';
+              document.getElementById('salary_transaction_id').value = '';
+          }
+      });
+    }
+});
+</script>
+
+
 {% endblock %}

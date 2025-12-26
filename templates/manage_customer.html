@@ -7,7 +7,12 @@
     </a>
     <div class="customer-header">
       <div>
-        <h2 class="customer-name">{{ customer.name }}</h2>
+        {% if customer.name|length > 12 %}
+          <h2 class="customer-name" title="{{ customer.name }}">{{ customer.name[:12] }}&hellip;</h2>
+        {% else %}
+          <h2 class="customer-name">{{ customer.name }}</h2>
+        {% endif %}
+        
         <div class="customer-membership">
           Membership No: {{ customer.membership_no or 'No data found' }}
         </div>
@@ -69,7 +74,7 @@
     <!-- Update Status Modal -->
     <div id="statusModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
-        <h2>Update Status & Payment</h2>
+        <h2 style="margin-top:3px;margin-bottom:10px;">Update Status & Payment</h2>
         <form id="statusUpdateForm" method="POST" action="{{ url_for('update_status', cnic=customer.cnic) }}">
         <div class="form-group">
             <label>Package</label>
@@ -99,6 +104,10 @@
                 <option value="Online">Online</option>
             </select>
         </div>
+        <div class="form-group" id="transaction-id-group" style="display:none;">
+          <label>Transaction ID</label>
+          <input type="text" name="transaction_id" id="transaction-id" placeholder="Enter Transaction ID if payment is online">
+      </div>
         <div class="form-group">
             <label>Payment Collected By</label>
             <select name="collector_name" class="form-input" required>
@@ -109,8 +118,8 @@
             </select>
         </div>
         <div class="modal-actions">
-            <button type="submit" class="leet-btn" style="background:#36b37e; color:#fff;">Save</button>
-            <button type="button" class="leet-btn modal-close-btn" style="background:#aaa; color:#222;" onclick="closeStatusModal()">Cancel</button>
+            <button type="submit" class="leet-btn" style="background:#ff7300; color:#fff;">Save</button>
+            <button type="button" class="leet-btn modal-close-btn" style="background:#181818; color:#fff;" onclick="closeStatusModal()">Cancel</button>
         </div>
         </form>
     </div>
@@ -157,6 +166,29 @@
     </script>
   {% endif %}
 {% endwith %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethod = document.querySelector('select[name="payment_method"]');
+    const transactionGroup = document.getElementById('transaction-id-group');
+    const transactionInput = document.getElementById('transaction-id');
+
+    function toggleTransactionField() {
+        if (paymentMethod.value === 'Online') {
+            transactionGroup.style.display = 'block';
+            transactionInput.required = true;
+        } else {
+            transactionGroup.style.display = 'none';
+            transactionInput.required = false;
+            transactionInput.value = '';
+        }
+    }
+
+    paymentMethod.addEventListener('change', toggleTransactionField);
+    toggleTransactionField(); // Run on page load in case of default selection
+});
+</script>
+
 
 <script>
 document.getElementById('open-status-modal').onclick = function() {

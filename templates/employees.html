@@ -14,6 +14,7 @@
                 <th>Employee Name</th>
                 <th>Employee Cnic</th>
                 <th>Employment Type</th>
+                <th>Phone No</th>
                 <th>Shift</th>
                 <th>Salary</th>
                 <th>Status</th>
@@ -23,9 +24,16 @@
         <tbody class="customers-table-body">
             {% for e in employees %}
             <tr>
-                <td>{{ e.name }}</td>
+                <td>
+                    {% if e.name  and e.name |length > 20 %}
+                        <span title="{{ e.name  }}">{{ e.name [:20] }}&hellip;</span>
+                    {% else %}
+                        {{ e.name  }}
+                    {% endif %}
+                </td>
                 <td>{{ e.cnic }}</td>
                 <td>{{ e.employment_type }}</td>
+                <td>{{ e.phone_number }}</td>
                 <td>{{ e.shift }}</td>
                 <td>{{ e.salary or 'No data' }}</td>
                 <td>
@@ -91,39 +99,44 @@
 
 <div id="addEmployeeModal" class="modal-overlay" style="display:none;">
   <div class="modal-content" style="max-width:500px;">
-    <h2>Add Employee</h2>
+    <h2 style="margin-top: 1px;">Add Employee</h2>
     <form id="addEmployeeForm" method="POST" action="{{ url_for('add_employee') }}">
       {{ form.hidden_tag() }}
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="name">Employee Name:</label>
         {{ form.name(class_="form-input", id="name") }}
       </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
-        <label for="cnic">Employee cnic:</label>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="cnic">Employee CNIC:</label>
         {{ form.cnic(class_="form-input", id="cnic") }}
-      </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+        <span id="cnic-error" class="form-error" style="color:#d90429;"></span>
+    </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="employment_type">Employment Type:</label>
         {{ form.employment_type(class_="form-input", id="employment_type") }}
       </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+        <label for="phone_number">Phone No:</label>
+        {{ form.phone_number(class_="form-input", id="phone_number") }}
+      </div>
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="timing">Timing:</label>
         {{ form.timing(class_="form-input", id="timing") }}
       </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="shift">Shift:</label>
         {{ form.shift(class_="form-input", id="shift") }}
       </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="salary">Salary:</label>
         {{ form.salary(class_="form-input", id="salary") }}
       </div>
-      <div class="form-block" style="margin-bottom:15px;font-size:15px;">
+      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
         <label for="status">Status:</label>
         {{ form.status(class_="form-input", id="status") }}
       </div>
       <div class="form-block" style="display: flex; gap: 10px;">
-        <button type="submit" class="leet-btn">Add Employee</button>
+        <button type="submit" class="leet-btn" id="add-employee-btn">Add Employee</button>
         <button type="button" class="leet-btn modal-close-btn" onclick="closeAddEmployeeModal()">Cancel</button>
     </div>
 
@@ -140,5 +153,74 @@ function closeAddEmployeeModal() {
     document.getElementById('addEmployeeModal').style.display = 'none';
 }
 </script>
+
+<style>
+.toast-error {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    background: #d90429;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('addEmployeeForm');
+    const cnicInput = document.getElementById('cnic');
+    const cnicError = document.getElementById('cnic-error');
+    const addBtn = document.getElementById('add-employee-btn');
+
+    function checkCnic() {
+        const cnic = cnicInput.value.trim();
+        if (!cnic) {
+            cnicError.textContent = '';
+            addBtn.disabled = true;
+            return;
+        }
+        fetch('{{ url_for("check_employee_cnic") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'cnic=' + encodeURIComponent(cnic)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                cnicError.textContent = 'This employee CNIC already exists.';
+                addBtn.disabled = true;
+            } else {
+                cnicError.textContent = '';
+                addBtn.disabled = false;
+            }
+        });
+    }
+
+    // Disable button on page load (optional, for extra safety)
+    addBtn.disabled = true;
+
+    cnicInput.addEventListener('input', checkCnic);
+
+    form.addEventListener('submit', function(e) {
+        if (cnicError.textContent !== '' || cnicInput.value.trim() === '') {
+            e.preventDefault();
+            addBtn.disabled = true;
+            cnicInput.focus();
+        }
+    });
+});
+</script>
+
 
 {% endblock %}

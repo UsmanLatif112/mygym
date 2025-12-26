@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Billing Summary</h1>
+<div class="customers-table-wrap">
+    <table class="customers-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Membership#</th>
+                <th>Package</th>
+                <th>Amount</th>
+                <th>Remaining</th>   <!-- New column -->
+                <th>Billing Date</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody class="customers-table-body">
+{% for c in customers %}
+<tr {% if loop.first %}style="border-top: 18px solid transparent;"{% endif %}>
+    <td>
+        {% if c.name and c.name|length > 20 %}
+            <span title="{{ c.name }}">{{ c.name[:20] }}&hellip;</span>
+        {% else %}
+            {{ c.name }}
+        {% endif %}
+    </td>
+    <td>{{ c.membership_no }}</td>
+    <td>{{ c.package }}</td>
+    <td>
+        {% set package_obj = packages_dict.get(c.package) %}
+        {{ package_obj.package_price if package_obj else "N/A" }}
+    </td>
+    <td>
+        {{ billing_dict.get(c.cnic, 0) }}
+    </td>
+    <td>{{ c.billing_date.strftime('%Y-%m-%d') if c.billing_date else 'N/A' }}</td>
+    <td>
+        <a href="{{ url_for('billing_history', cnic=c.cnic) }}" class="manage-btn">Manage</a>
+    </td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="7" style="text-align:center; padding:20px;">No billing data found.</td>
+</tr>
+{% endfor %}
+</tbody>
+
+
+
+    </table>
+</div>
+
+<style>
+.customers-table tbody tr {
+    border-bottom: 10px solid transparent;    /* Adds vertical gap between rows */
+}
+.customers-table tbody tr:last-child {
+    border-bottom: none; /* No gap after the last row */
+}
+</style>
+{% endblock %}

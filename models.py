@@ -61,9 +61,13 @@ class Invoice(db.Model):
 
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    type = db.Column(db.String(50))  # e.g., salary, equipment
-    amount = db.Column(db.Float)
-    date = db.Column(db.Date)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+    amount = db.Column(db.Float, nullable=False)
+    paid_by = db.Column(db.String(120), nullable=False)  # Employee name
+    payment_method = db.Column(db.String(50), nullable=False)
+    transaction_id = db.Column(db.String(100), nullable=True)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Trainer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -81,12 +85,14 @@ class Billing(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_name = db.Column(db.String(120), nullable=False)
     membership_no = db.Column(db.String(20), nullable=False)
+    customer_cnic = db.Column(db.String(20), nullable=False) 
     paid_to_be_amount = db.Column(db.Float, nullable=False)
     paid_amount = db.Column(db.Float, nullable=False)
     remaining_amount = db.Column(db.Float, nullable=False)
     payment_collected_by = db.Column(db.String(100), nullable=False)   # Employee name or ID
     payment_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     payment_method = db.Column(db.String(50), nullable=False)  
+    transaction_id = db.Column(db.String(50), nullable=True) 
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -96,6 +102,7 @@ class Employee(db.Model):
     timing = db.Column(db.String(50), nullable=True)
     shift = db.Column(db.String(50), nullable=True)
     salary = db.Column(db.Float, nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
     cnic = db.Column(db.String(20), nullable=True)
     thumb_id = db.Column(db.String(100))  # For attendance
 
@@ -105,3 +112,27 @@ class Packages(db.Model):
     package_price = db.Column(db.String(100))
     packgae_duration = db.Column(db.String(100))
     registeration_fees = db.Column(db.String(100))
+    
+class BillingHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    customer_cnic = db.Column(db.String(20), nullable=False)
+    customer_name = db.Column(db.String(120), nullable=False)
+    membership_no = db.Column(db.String(20), nullable=False)
+    amount_to_be_paid = db.Column(db.Float, nullable=False)
+    paid_amount = db.Column(db.Float, nullable=False)
+    remaining_amount = db.Column(db.Float, nullable=False)
+    payment_collected_by = db.Column(db.String(100), nullable=False)
+    payment_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    payment_method = db.Column(db.String(50), nullable=False)
+    transaction_id = db.Column(db.String(50), nullable=True)
+
+
+class SalaryHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, nullable=False)
+    employee_name = db.Column(db.String(120), nullable=False)
+    salary_amount = db.Column(db.Float, nullable=False)
+    payment_type = db.Column(db.String(20), nullable=False)  # 'Salary' or 'Advance'
+    payment_method = db.Column(db.String(50), nullable=False)  # 'Cash' or 'Online'
+    transaction_id = db.Column(db.String(100), nullable=True)
+    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)

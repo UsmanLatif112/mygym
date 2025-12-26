@@ -13,9 +13,23 @@
     <div class="sidebar">
         <img src="{{ url_for('static', filename='logo.png') }}" class="logo-center"/>
         {% if current_user.is_authenticated %}
-            <h3>Welcome, {{ current_user.username|capitalize }}</h3>
+            <div style="text-align:center; margin-bottom: 2px;">
+                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;">Welcome</div>
+                {% if current_user.username|length > 12 %}
+                    <div style="font-size: 1.2em; color: #ffb347; margin-top: 8px; word-break: break-word;"
+                        title="{{ current_user.username|capitalize }}">
+                        {{ current_user.username[:12]|capitalize }}&hellip;
+                    </div>
+                {% else %}
+                    <div style="font-size: 1.2em; color: #ffb347; margin-top: 8px; word-break: break-word;">
+                        {{ current_user.username|capitalize }}
+                    </div>
+                {% endif %}
+            </div>
         {% else %}
-            <h3>Welcome to My Gym</h3>
+            <div style="text-align:center; margin-bottom: 24px;">
+                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;">Welcome to My Gym</div>
+            </div>
         {% endif %}
         <ul>
             <li><a href="/"><i class="fa fa-chart-pie"></i> Dashboard</a></li>
@@ -28,8 +42,13 @@
                     </a>
                 </li>
                 {% endif %}
-            <li><a href="/billing"><i class="fa fa-file-invoice-dollar"></i> Billing</a></li>
+            {% if current_user.role_id == '1' %}
+                <li><a href="/billing"><i class="fa fa-file-invoice-dollar"></i> Billing</a></li>
+            {% endif %}
             <li><a href="/expenses"><i class="fa fa-wallet"></i> Expenses</a></li>
+            {% if current_user.role_id == '1' %}
+            <li><a href="/accounts"><i class="fa fa-briefcase"></i> Accounts</a></li>
+            {% endif %}
             <li><a href="/attendance"><i class="fa fa-fingerprint"></i> Attendance</a></li>
             <li><a href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
         </ul>
