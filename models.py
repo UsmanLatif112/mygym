@@ -51,6 +51,9 @@ class Customer(db.Model):
     join_reasons = db.Column(db.String(200))
     terms_accepted = db.Column(db.Boolean, default=False)
     thumb_id = db.Column(db.String(100))
+    invoices = db.relationship('Invoice', backref='customer', cascade="all, delete-orphan")
+    billings = db.relationship('Billing', backref='customer', primaryjoin="Customer.cnic == foreign(Billing.customer_cnic)", cascade="all, delete-orphan")
+    billing_histories = db.relationship('BillingHistory', backref='customer', primaryjoin="Customer.cnic == foreign(BillingHistory.customer_cnic)", cascade="all, delete-orphan")
 
 class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -105,6 +108,7 @@ class Employee(db.Model):
     phone_number = db.Column(db.String(20), nullable=True)
     cnic = db.Column(db.String(20), nullable=True)
     thumb_id = db.Column(db.String(100))  # For attendance
+    salaries = db.relationship('SalaryHistory', backref='employee', primaryjoin="Employee.id == foreign(SalaryHistory.employee_id)", cascade="all, delete-orphan")
 
 class Packages(db.Model):
     id = db.Column(db.Integer, primary_key=True)

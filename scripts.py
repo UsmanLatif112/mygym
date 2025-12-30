@@ -6,9 +6,9 @@
 #     db.create_all()  # Ensure tables exist
 
 #     # Change these values as you wish
-#     username = 'admin 2'
+#     username = 'admin'
 #     password = 'admin123'
-#     role_id = 2
+#     role_id = 1
 
 #     if not User.query.filter_by(username=username).first():
 #         user = User(username=username, role_id=role_id)
@@ -20,19 +20,19 @@
 #         print('User already exists.')
 
 
-# from app import app, db
+from app import app, db
 
-# # Make sure this matches your new Billing model!
-# from models import SalaryHistory
+# Make sure this matches your new Billing model!
+from models import Customer
 
-# with app.app_context():
-#     # Drop the existing 'billing' table if it exists
-#     SalaryHistory.__table__.drop(db.engine, checkfirst=True)
-#     print("Dropped existing 'billing' table (if it existed).")
+with app.app_context():
+    # Drop the existing 'billing' table if it exists
+    Customer.__table__.drop(db.engine, checkfirst=True)
+    print("Dropped existing 'billing' table (if it existed).")
 
-#     # Recreate the new 'billing' table
-#     db.create_all()
-#     print("Created new 'billing' table with updated schema.")
+    # Recreate the new 'billing' table
+    db.create_all()
+    print("Created new 'billing' table with updated schema.")
 
 # from app import app, db
 # from models import Billing
@@ -61,42 +61,42 @@
 #         print(f"Customer with CNIC {cnic} not found.")
 
 
-from app import app, db
-from models import Packages
+# from app import app, db
+# from models import Packages
 
-# --- Define all your packages ---
-package_data = [
-    # package_name, package_price, packgae_duration, registeration_fees
-    ("Individual_Monthly", "3500", "1 month", "2000"),
-    ("Individual_3Month", "9000", "3 month", "1000"),
-    ("Individual_6Month", "18000", "6 month", "0"),
-    ("Personal_Monthly", "13500", "1 month", "2000"),
-    ("Personal_3Month", "39000", "3 month", "1000"),
-    ("Personal_6Month", "68000", "6 month", "0")
-]
+# # --- Define all your packages ---
+# package_data = [
+#     # package_name, package_price, packgae_duration, registeration_fees
+#     ("Individual_Monthly", "3500", "1 month", "2000"),
+#     ("Individual_3Month", "9000", "3 month", "1000"),
+#     ("Individual_6Month", "18000", "6 month", "0"),
+#     ("Personal_Monthly", "13500", "1 month", "2000"),
+#     ("Personal_3Month", "39000", "3 month", "1000"),
+#     ("Personal_6Month", "68000", "6 month", "0")
+# ]
 
-with app.app_context():
-    # Create the table if it doesn't exist
-    db.create_all()
+# with app.app_context():
+#     # Create the table if it doesn't exist
+#     db.create_all()
 
-    # Clear out existing data (optional, only do if you want a fresh start)
-    Packages.query.delete()
-    db.session.commit()
+#     # Clear out existing data (optional, only do if you want a fresh start)
+#     Packages.query.delete()
+#     db.session.commit()
 
-    # Insert the packages
-    for name, price, duration, fees in package_data:
-        # Check if package already exists to avoid duplicates
-        exists = Packages.query.filter_by(package_name=name).first()
-        if not exists:
-            pkg = Packages(
-                package_name=name,
-                package_price=price,
-                packgae_duration=duration,
-                registeration_fees=fees
-            )
-            db.session.add(pkg)
-    db.session.commit()
-    print("Packages table created and data inserted.")
+#     # Insert the packages
+#     for name, price, duration, fees in package_data:
+#         # Check if package already exists to avoid duplicates
+#         exists = Packages.query.filter_by(package_name=name).first()
+#         if not exists:
+#             pkg = Packages(
+#                 package_name=name,
+#                 package_price=price,
+#                 packgae_duration=duration,
+#                 registeration_fees=fees
+#             )
+#             db.session.add(pkg)
+#     db.session.commit()
+#     print("Packages table created and data inserted.")
 
 
 # # from app import app, db

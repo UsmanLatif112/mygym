@@ -210,19 +210,29 @@ def add_employee():
         flash('Error adding employee. Please check your input.', 'danger')
     return redirect(url_for('employees'))
 
+# @app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
+# @login_required
+# def delete_employee(employee_id):
+#     if str(current_user.role_id) != '1':
+#         return abort(403)
+#     # You may want to check permissions here (e.g. role_id)
+#     employee = Employee.query.get_or_404(employee_id)
+#     db.session.delete(employee)
+#     db.session.commit()
+#     flash('Employee deleted successfully!', 'success')
+#     return redirect(url_for('employees'))
+
+
 @app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
 @login_required
 def delete_employee(employee_id):
     if str(current_user.role_id) != '1':
         return abort(403)
-    # You may want to check permissions here (e.g. role_id)
     employee = Employee.query.get_or_404(employee_id)
     db.session.delete(employee)
     db.session.commit()
     flash('Employee deleted successfully!', 'success')
     return redirect(url_for('employees'))
-
-
 
 
 @app.route('/add_customer', methods=['GET', 'POST'])
@@ -407,6 +417,16 @@ def edit_customer(cnic):
 
 
 
+# @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
+# @login_required
+# def delete_customer(cnic):
+#     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+#     db.session.delete(customer)
+#     db.session.commit()
+#     flash("Customer deleted successfully!", "success")
+#     return redirect(url_for('customers'))
+
+
 @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
 @login_required
 def delete_customer(cnic):
@@ -415,7 +435,6 @@ def delete_customer(cnic):
     db.session.commit()
     flash("Customer deleted successfully!", "success")
     return redirect(url_for('customers'))
-
 
 @app.route('/update_status/<cnic>', methods=['POST'])
 @login_required
