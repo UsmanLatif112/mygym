@@ -539,6 +539,7 @@ def billing():
     )
 
 
+
 @app.route('/accounts')
 @login_required
 def accounts():
@@ -547,21 +548,36 @@ def accounts():
     custom_end = request.args.get('end')
 
     today = datetime.utcnow()
+    # Default values
+    start_dt = today - timedelta(days=30)
+    end_dt = today
+
     if period == '1m':
         start_dt = today - timedelta(days=30)
+        end_dt = today
     elif period == '2m':
         start_dt = today - timedelta(days=60)
+        end_dt = today
     elif period == '6m':
         start_dt = today - timedelta(days=180)
+        end_dt = today
     elif period == '1y':
         start_dt = today - timedelta(days=365)
-    elif period == 'custom' and custom_start and custom_end:
-        start_dt = datetime.strptime(custom_start, '%Y-%m-%d')
-        end_dt = datetime.strptime(custom_end, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
-    else:
-        start_dt = today - timedelta(days=30)
-    if period != 'custom':
         end_dt = today
+    elif period == 'custom':
+        # Only use custom if both dates are given and valid
+        try:
+            if custom_start and custom_end:
+                start_dt = datetime.strptime(custom_start, '%Y-%m-%d')
+                end_dt = datetime.strptime(custom_end, '%Y-%m-%d') + timedelta(days=1) - timedelta(seconds=1)
+            else:
+                # If missing, fallback to last 30 days
+                start_dt = today - timedelta(days=30)
+                end_dt = today
+        except Exception:
+            # If parsing fails, fallback to last 30 days
+            start_dt = today - timedelta(days=30)
+            end_dt = today
 
     # Filters
     bh_filter = (BillingHistory.payment_date >= start_dt) & (BillingHistory.payment_date <= end_dt)
@@ -611,6 +627,7 @@ def accounts():
         custom_start=custom_start,
         custom_end=custom_end
     )
+
 
 @app.route('/billing_history/<cnic>', methods=['GET'])
 @login_required

@@ -5,17 +5,65 @@ body {
     color: #fff;
 }
 .login-container {
-    max-width: 370px;
-    margin: 20px auto;
     background: #232323;
-    padding: 42px 36px 36px 36px;
-    border-radius: 18px;
-    box-shadow: 0 4px 32px #0009;
-    text-align: left;
+    padding: 38px 34px 32px 34px;
+    border-radius: 14px;
+    box-shadow: 0 4px 32px #0004;
+    max-width: 370px;
+    margin: 60px auto 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
+
+.login-form {
+    width: 100%;
+}
+
+.login-field label {
+    color: #ffb347;
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+}
+
+.login-input {
+    height: 41px;
+    font-size: 1.08em;
+    background: #181818;
+    color: #fff;
+    border: 1.5px solid #3a3a3a;
+    border-radius: 6px;
+    padding: 0 14px;
+    margin-top: 2px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.login-input:focus {
+    border: 1.5px solid #ff7300;
+}
+
+.login-btn {
+    width: 100%;
+    height: 43px;
+    font-size: 1.13em;
+    margin-top: 8px;
+    background: #ff7300;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: background 0.2s;
+    letter-spacing: 0.4px;
+}
+
+.login-btn:hover {
+    background: #ffb347;
+    color: #232323;
+}
+
+
 .login-container h2 {
     margin-bottom: 18px;
     color: #ff7300;
@@ -26,7 +74,7 @@ body {
 }
 .login-container input[type="text"],
 .login-container input[type="password"] {
-    width: 100%;
+    width: 93%;
     padding: 13px 10px;
     margin: 13px 0 20px 0;
     border-radius: 8px;
@@ -67,7 +115,6 @@ body {
     border: none;
     font-size: 1.01em;
     font-weight: 600;
-    padding: 14px 0;
     width: 150px;
     height: 40px;
     border-radius: 7px;
