@@ -1,7 +1,7 @@
 import qrcode
 
 # Replace this with your actual public URL
-qr_url = "http://127.0.0.1:5000//add_customer?mode=qr"
+qr_url = "https://app.mygymlahore.com/add_customer?mode=qr"
 
 # Generate QR code
 qr = qrcode.QRCode(
