@@ -3,7 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import BillingHistory, db, User, Customer, Billing, Packages,Employee, Attendance
 from models import db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory
-
 from forms import LoginForm, CustomerForm, EmployeeForm
 from datetime import datetime
 import json
@@ -11,10 +10,10 @@ from dateutil.relativedelta import relativedelta
 from flask import redirect, url_for
 from sqlalchemy import or_
 from flask import request, jsonify
-
 from datetime import datetime, timedelta
-
 from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no
+
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
@@ -26,84 +25,25 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 
-@app.route('/check_employee_cnic', methods=['POST'])
-@login_required
-def check_employee_cnic():
-    cnic = request.form.get('cnic')
-    exists = Employee.query.filter_by(cnic=cnic).first() is not None
-    return jsonify({'exists': exists})
-
+# Flash route =====================================
 
 @app.errorhandler(404)
 def page_not_found(e):
     flash("Page not found. Redirected to home.", "warning")
     return redirect(url_for('dashboard'))
 
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))
-
-
-from flask import render_template, request, redirect, url_for, flash
-from models import Employee
-from forms import EmployeeForm
-from app import db
-
-@app.route('/edit_employee/<int:employee_id>', methods=['POST'])
-@login_required
-def edit_employee(employee_id):
-    if str(current_user.role_id) != '1':
-        return abort(403)
-    employee = Employee.query.get_or_404(employee_id)
-    form = EmployeeForm(obj=employee)
-
-    # Make sure CNIC is not edited
-    form.cnic.data = employee.cnic
-
-    if form.validate_on_submit():
-        form.populate_obj(employee)
-        employee.cnic = employee.cnic
-        db.session.commit()
-        flash('Employee updated successfully!', 'success')
-    else:
-        flash('There was an error updating the employee.', 'danger')
-    return redirect(url_for('manage_employee', employee_id=employee.id))
-
-
-@app.route('/registration_success')
-def registration_success():
-    is_qr = request.args.get('mode') == 'qr'
-    return render_template('registration_success.html', is_qr=is_qr)
-
-
-
 @app.route('/')
 @login_required
 def dashboard():
     today = datetime.utcnow().date()
-
-    # 1. Total customers
     total_customers = Customer.query.count()
-
-    # 2. Active customers
     active_customers = Customer.query.filter_by(status='Active').count()
-
-    # 3. Pending billing (billing_date < today)
     pending_billing_customers = Customer.query.filter(
         Customer.billing_date < today
     ).count()
-
-    # 4. Total employees
     total_employees = Employee.query.count()
-
-    # 5. Trainer count
     trainers_count = Employee.query.filter_by(employment_type='Trainer').count()
-
-    # 6. Office boy count
     office_boy_count = Employee.query.filter_by(employment_type='Office Boy').count()
-
-    # 7. Customers with Personal Training
-    # (Assumes personal training is in the package or type field, adjust as needed)
     personal_training_customers = Customer.query.filter(
     Customer.status == 'Active',
     or_(
@@ -123,17 +63,7 @@ def dashboard():
         personal_training_customers=personal_training_customers
     )
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password', 'error')
-    return render_template('login.html', form=form)
+# Customer routes ==========================
 
 @app.route('/customers')
 @login_required
@@ -158,176 +88,6 @@ def customers():
     print("Flashed messages:", messages)
     # Pass packages_dict to the template
     return render_template("customers.html", customers=customers_list, packages_dict=packages_dict)
-
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-@app.route('/edit_employee_by_cnic/<cnic>', methods=['POST'])
-@login_required
-def edit_employee_by_cnic(cnic):
-    if str(current_user.role_id) != '1':
-        return abort(403)
-    employee = Employee.query.filter_by(cnic=cnic).first_or_404()
-    form = EmployeeForm(request.form)
-    # Set choices for SelectFields (as before)
-    form.employment_type.choices = [('Owner', 'Owner'), ('Trainer', 'Trainer'), ('Office Boy', 'Office Boy')]
-    form.shift.choices = [('Morning', 'Morning'), ('Evening', 'Evening'), ('Night', 'Night')]
-    form.status.choices = [('Active', 'Active'), ('Inactive', 'Inactive')]
-    form.cnic.data = employee.cnic
-    form._current_employee = employee  # <-- This disables uniqueness check
-
-    if form.validate_on_submit():
-        employee.name = form.name.data
-        employee.employment_type = form.employment_type.data
-        employee.phone_number = form.phone_number.data
-        employee.timing = form.timing.data
-        employee.shift = form.shift.data
-        employee.salary = form.salary.data
-        employee.status = form.status.data
-        db.session.commit()
-        flash('Employee updated successfully!', 'success')
-    else:
-        print("Form errors:", form.errors)
-        flash('There was an error updating the employee.', 'danger')
-    return redirect(url_for('manage_employee', employee_id=employee.id))
-
-@app.route('/add_employee', methods=['POST'])
-@login_required
-def add_employee():
-    if str(current_user.role_id) != '1':
-        return abort(403)
-    form = EmployeeForm()
-    if form.validate_on_submit():
-        new_employee = Employee(
-            name=form.name.data,
-            cnic=form.cnic.data,
-            employment_type=form.employment_type.data,
-            phone_number=form.phone_number.data,
-            timing=form.timing.data,
-            shift=form.shift.data,
-            status=form.status.data,
-            salary=form.salary.data
-        )
-        db.session.add(new_employee)
-        db.session.commit()
-        flash('Employee added successfully!', 'success')
-    else:
-        flash('Error adding employee. Please check your input.', 'danger')
-    return redirect(url_for('employees'))
-
-
-
-
-@app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
-@login_required
-def delete_employee(employee_id):
-    if str(current_user.role_id) != '1':
-        return abort(403)
-    employee = Employee.query.get_or_404(employee_id)
-    db.session.delete(employee)
-    db.session.commit()
-    flash('Employee deleted successfully!', 'success')
-    return redirect(url_for('employees'))
-
-
-# @app.route('/add_customer', methods=['GET', 'POST'])
-# @login_required
-# def add_customer():
-#     form = CustomerForm()
-#     membership_no = generate_membership_no()
-
-#     # Fetch all packages and group by type
-#     all_packages = Packages.query.all()
-#     individual_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Individual']
-#     personal_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Personal Training']
-
-#     trainers = Employee.query.filter_by(employment_type='Trainer').all()
-#     form.trainer.choices = [(t.name, t.name) for t in trainers]
-
-#     # Set defaults for first load
-#     if request.method == 'GET':
-#         form.training_type.data = 'Individual'
-#         if individual_packages:
-#             form.package.data = individual_packages[0][0]
-#     # On POST, set choices based on selected training type
-#     elif request.method == 'POST':
-#         if form.training_type.data == 'Personal':
-#             form.package.choices = personal_packages
-#         else:
-#             form.package.choices = individual_packages
-
-#     # Always set package choices for current state
-#     if form.training_type.data == 'Personal':
-#         form.package.choices = personal_packages
-#     else:
-#         form.package.choices = individual_packages
-
-#     if form.validate_on_submit():
-#         admission_date = form.admission_date.data
-#         package_id = int(form.package.data)
-#         package_obj = Packages.query.get(package_id)
-#         billing_date = get_billing_date(admission_date, package_obj.package_duration)
-#         customer_type = form.training_type.data
-
-#         if customer_type == 'Individual':
-#             trainer = None
-#             personal_training_time = None
-#         else:
-#             trainer = form.trainer.data
-#             personal_training_time = form.personal_training_time.data
-
-#         customer = Customer(
-#             membership_no=membership_no,
-#             status="Not Paid",
-#             type=customer_type,
-#             admission_date=admission_date,
-#             billing_date=billing_date,
-#             package_id=package_id,
-#             name=form.name.data,
-#             father_or_husband=form.father_or_husband.data,
-#             cnic=form.cnic.data,
-#             email=form.email.data,
-#             gender=form.gender.data,
-#             marital_status=form.marital_status.data,
-#             blood_group=form.blood_group.data,
-#             dob=form.dob.data,
-#             height=parse_float(form.height.data),
-#             weight=parse_float(form.weight.data),
-#             waist=parse_float(form.waist.data),
-#             profession=form.profession.data,
-#             nationality=form.nationality.data,
-#             address=form.address.data,
-#             phone=form.phone.data,
-#             emergency_contact=form.emergency_contact.data,
-#             personal_training_time=personal_training_time,
-#             trainer=trainer,
-#             bmi_test=form.bmi_test.data,
-#             bmi_value=parse_float(form.bmi_value.data),
-#             illnesses=parse_tagify(form.illnesses.data),
-#             join_reasons=parse_tagify(form.join_reasons.data),
-#             terms_accepted=form.terms_accepted.data
-#         )
-#         db.session.add(customer)
-#         db.session.commit()
-#         flash("Customer added successfully!", "success")
-#         return redirect(url_for('customers'))
-
-#     if not form.admission_date.data:
-#         form.admission_date.data = datetime.now().date()
-
-#     return render_template(
-#         'add_customer.html',
-#         form=form,
-#         membership_no=membership_no,
-#         trainers=trainers,
-#         admission_date=form.admission_date.data,
-#         individual_packages=individual_packages,
-#         personal_packages=personal_packages
-#     )
 
 @app.route('/add_customer', methods=['GET', 'POST'])
 def add_customer():
@@ -428,39 +188,6 @@ def add_customer():
         is_qr=is_qr
     )
 
-
-@app.route('/terms')
-def terms():
-    return render_template('terms.html')
-
-@app.route('/employees')
-@login_required
-def employees():
-    if str(current_user.role_id) != '1':
-        abort(403)
-    all_employees = Employee.query.all()
-    form = EmployeeForm()  # create the form instance
-    return render_template('employees.html', employees=all_employees, form=form)
-
-
-@app.route('/employees/<int:employee_id>')
-@login_required
-def manage_employee(employee_id):
-    if str(current_user.role_id) != '1':
-        abort(403)
-    employee = Employee.query.get_or_404(employee_id)
-    form = EmployeeForm(obj=employee)
-    salary_history = SalaryHistory.query.filter_by(employee_id=employee.id).order_by(SalaryHistory.transaction_date.desc()).all()
-    # Now salary_history is defined, so this works:
-    total_advance = sum(s.salary_amount for s in salary_history if s.payment_type == 'Advance')
-    return render_template(
-        'manage_employee.html',
-        employee=employee,
-        form=form,
-        salary_history=salary_history,
-        total_advance=total_advance
-    )
-
 @app.route('/customers/<cnic>')
 @login_required
 def manage_customer(cnic):
@@ -486,8 +213,6 @@ def manage_customer(cnic):
         amount_to_be_paid=amount_to_be_paid,
         employees=employees,
     )
-
-
 
 @app.route('/edit_customer/<cnic>', methods=['GET', 'POST'])
 @login_required
@@ -642,79 +367,153 @@ def update_status(cnic):
     flash('Status and payment updated successfully.', 'success')
     return redirect(url_for('manage_customer', cnic=customer.cnic))
 
-
-
-@app.route('/mark_absent_inactive')
-@login_required
-def mark_absent_inactive():
-    # Only allow admins
-    if str(current_user.role_id) != '1':
-        flash("Unauthorized", "danger")
-        return redirect(url_for('dashboard'))
-
-    cust_inactive_count = emp_inactive_count = 0
-
-    # Customers
-    customers = Customer.query.filter_by(status='Active').all()
-    for customer in customers:
-        attendance_exists = Attendance.query.filter(
-            Attendance.thumb_id == customer.thumb_id
-        ).first()
-        if not attendance_exists:
-            customer.status = 'Inactive'
-            cust_inactive_count += 1
-
-    # Employees
-    employees = Employee.query.filter_by(status='Active').all()
-    for employee in employees:
-        attendance_exists = Attendance.query.filter(
-            Attendance.thumb_id == employee.thumb_id
-        ).first()
-        if not attendance_exists:
-            employee.status = 'Inactive'
-            emp_inactive_count += 1
-
-    db.session.commit()
-    flash(f"Marked {cust_inactive_count} customers and {emp_inactive_count} employees as Inactive (no attendance on record).", "success")
-    return redirect(url_for('dashboard'))
-
-
-
 @app.route('/customer_billing/<cnic>')
 @login_required
 def customer_billing(cnic):
     billings = Billing.query.filter_by(membership_no=cnic).order_by(Billing.payment_date.desc()).all()
     return render_template('billing_history.html', billings=billings)
 
+# login routes ========================
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+    return render_template('login.html', form=form)
 
-@app.route('/billing')
+@app.route('/logout')
 @login_required
-def billing():
-    billed_cnic = db.session.query(Billing.customer_cnic).distinct()
-    billed_membership = db.session.query(Billing.membership_no).distinct()
-    customers = Customer.query.filter(
-        (Customer.cnic.in_(billed_cnic)) | (Customer.membership_no.in_(billed_membership))
-    ).all()
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
-    packages = Packages.query.all()
-    packages_dict = {p.id: p for p in packages}
+# employee routes ==============
 
-    billing_dict = {}
-    for c in customers:
-        billing = Billing.query.filter_by(customer_cnic=c.cnic).order_by(Billing.payment_date.desc()).first()
-        billing_dict[c.cnic] = billing.remaining_amount if billing else 0
+@app.route('/check_employee_cnic', methods=['POST'])
+@login_required
+def check_employee_cnic():
+    cnic = request.form.get('cnic')
+    exists = Employee.query.filter_by(cnic=cnic).first() is not None
+    return jsonify({'exists': exists})
 
+@app.route('/edit_employee/<int:employee_id>', methods=['POST'])
+@login_required
+def edit_employee(employee_id):
+    if str(current_user.role_id) != '1':
+        return abort(403)
+    employee = Employee.query.get_or_404(employee_id)
+    form = EmployeeForm(obj=employee)
+
+    # Make sure CNIC is not edited
+    form.cnic.data = employee.cnic
+
+    if form.validate_on_submit():
+        form.populate_obj(employee)
+        employee.cnic = employee.cnic
+        db.session.commit()
+        flash('Employee updated successfully!', 'success')
+    else:
+        flash('There was an error updating the employee.', 'danger')
+    return redirect(url_for('manage_employee', employee_id=employee.id))
+
+@app.route('/edit_employee_by_cnic/<cnic>', methods=['POST'])
+@login_required
+def edit_employee_by_cnic(cnic):
+    if str(current_user.role_id) != '1':
+        return abort(403)
+    employee = Employee.query.filter_by(cnic=cnic).first_or_404()
+    form = EmployeeForm(request.form)
+    # Set choices for SelectFields (as before)
+    form.employment_type.choices = [('Owner', 'Owner'), ('Trainer', 'Trainer'), ('Office Boy', 'Office Boy')]
+    form.shift.choices = [('Morning', 'Morning'), ('Evening', 'Evening'), ('Night', 'Night')]
+    form.status.choices = [('Active', 'Active'), ('Inactive', 'Inactive')]
+    form.cnic.data = employee.cnic
+    form._current_employee = employee  # <-- This disables uniqueness check
+
+    if form.validate_on_submit():
+        employee.name = form.name.data
+        employee.employment_type = form.employment_type.data
+        employee.phone_number = form.phone_number.data
+        employee.timing = form.timing.data
+        employee.shift = form.shift.data
+        employee.salary = form.salary.data
+        employee.status = form.status.data
+        db.session.commit()
+        flash('Employee updated successfully!', 'success')
+    else:
+        print("Form errors:", form.errors)
+        flash('There was an error updating the employee.', 'danger')
+    return redirect(url_for('manage_employee', employee_id=employee.id))
+
+@app.route('/add_employee', methods=['POST'])
+@login_required
+def add_employee():
+    if str(current_user.role_id) != '1':
+        return abort(403)
+    form = EmployeeForm()
+    if form.validate_on_submit():
+        new_employee = Employee(
+            name=form.name.data,
+            cnic=form.cnic.data,
+            employment_type=form.employment_type.data,
+            phone_number=form.phone_number.data,
+            timing=form.timing.data,
+            shift=form.shift.data,
+            status=form.status.data,
+            salary=form.salary.data
+        )
+        db.session.add(new_employee)
+        db.session.commit()
+        flash('Employee added successfully!', 'success')
+    else:
+        flash('Error adding employee. Please check your input.', 'danger')
+    return redirect(url_for('employees'))
+
+@app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
+@login_required
+def delete_employee(employee_id):
+    if str(current_user.role_id) != '1':
+        return abort(403)
+    employee = Employee.query.get_or_404(employee_id)
+    db.session.delete(employee)
+    db.session.commit()
+    flash('Employee deleted successfully!', 'success')
+    return redirect(url_for('employees'))
+
+@app.route('/employees')
+@login_required
+def employees():
+    if str(current_user.role_id) != '1':
+        abort(403)
+    all_employees = Employee.query.all()
+    form = EmployeeForm()  # create the form instance
+    return render_template('employees.html', employees=all_employees, form=form)
+
+@app.route('/employees/<int:employee_id>')
+@login_required
+def manage_employee(employee_id):
+    if str(current_user.role_id) != '1':
+        abort(403)
+    employee = Employee.query.get_or_404(employee_id)
+    form = EmployeeForm(obj=employee)
+    salary_history = SalaryHistory.query.filter_by(employee_id=employee.id).order_by(SalaryHistory.transaction_date.desc()).all()
+    # Now salary_history is defined, so this works:
+    total_advance = sum(s.salary_amount for s in salary_history if s.payment_type == 'Advance')
     return render_template(
-        'billing.html',
-        customers=customers,
-        packages_dict=packages_dict,
-        billing_dict=billing_dict
+        'manage_employee.html',
+        employee=employee,
+        form=form,
+        salary_history=salary_history,
+        total_advance=total_advance
     )
 
-
-
-
+# accounts page ===============
 
 @app.route('/accounts')
 @login_required
@@ -804,6 +603,32 @@ def accounts():
         custom_end=custom_end
     )
 
+# Billing route ================
+
+@app.route('/billing')
+@login_required
+def billing():
+    billed_cnic = db.session.query(Billing.customer_cnic).distinct()
+    billed_membership = db.session.query(Billing.membership_no).distinct()
+    customers = Customer.query.filter(
+        (Customer.cnic.in_(billed_cnic)) | (Customer.membership_no.in_(billed_membership))
+    ).all()
+
+    packages = Packages.query.all()
+    packages_dict = {p.id: p for p in packages}
+
+    billing_dict = {}
+    for c in customers:
+        billing = Billing.query.filter_by(customer_cnic=c.cnic).order_by(Billing.payment_date.desc()).first()
+        billing_dict[c.cnic] = billing.remaining_amount if billing else 0
+
+    return render_template(
+        'billing.html',
+        customers=customers,
+        packages_dict=packages_dict,
+        billing_dict=billing_dict
+    )
+
 @app.route('/billing_history/<cnic>', methods=['GET'])
 @login_required
 def billing_history(cnic):
@@ -831,8 +656,6 @@ def billing_history(cnic):
         previous_remaining=previous_remaining,
         amount_to_be_paid=amount_to_be_paid,
     )
-
-
 
 @app.route('/delete_billing_history/<int:billing_id>/<cnic>', methods=['POST'])
 @login_required
@@ -898,6 +721,7 @@ def add_billing_history(cnic):
     flash('Payment added to billing history!', 'success')
     return redirect(url_for('billing_history', cnic=customer.cnic))
 
+# expense routes ==============
 
 @app.route('/expenses', methods=['GET', 'POST'])
 @login_required
@@ -906,7 +730,6 @@ def expenses():
     expenses = Expense.query.order_by(Expense.date.desc()).all()
     total_expense = sum(e.amount for e in expenses)
     return render_template('expenses.html', expenses=expenses, employees=employees, total_expense=total_expense)
-
 
 @app.route('/add_expense', methods=['POST'])
 @login_required
@@ -940,27 +763,7 @@ def delete_expense(expense_id):
     flash('Expense deleted.', 'success')
     return redirect(url_for('expenses'))
 
-@app.route('/pay_salary/<int:employee_id>', methods=['POST'])
-@login_required
-def pay_salary(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    salary_amount = float(request.form.get('salary_amount', 0))
-    payment_type = request.form.get('payment_type', 'Salary')
-    payment_method = request.form.get('payment_method', 'Cash')
-    transaction_id = request.form.get('transaction_id', None)
-    salary_entry = SalaryHistory(
-        employee_id=employee.id,
-        employee_name=employee.name,
-        salary_amount=salary_amount,
-        payment_type=payment_type,
-        payment_method=payment_method,
-        transaction_id=transaction_id if payment_method == 'Online' else None,
-        transaction_date=datetime.utcnow()
-    )
-    db.session.add(salary_entry)
-    db.session.commit()
-    flash('Salary record added!', 'success')
-    return redirect(url_for('manage_employee', employee_id=employee.id))
+# package routes ==============
 
 @app.route('/packages', methods=['GET', 'POST'])
 @login_required
@@ -1011,6 +814,84 @@ def packages():
 
     return render_template('packages.html', packages=all_packages)
 
+# terms and conditions route===========
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+# customer management =========
+
+@app.route('/mark_absent_inactive')
+@login_required
+def mark_absent_inactive():
+    # Only allow admins
+    if str(current_user.role_id) != '1':
+        flash("Unauthorized", "danger")
+        return redirect(url_for('dashboard'))
+
+    cust_inactive_count = emp_inactive_count = 0
+
+    # Customers
+    customers = Customer.query.filter_by(status='Active').all()
+    for customer in customers:
+        attendance_exists = Attendance.query.filter(
+            Attendance.thumb_id == customer.thumb_id
+        ).first()
+        if not attendance_exists:
+            customer.status = 'Inactive'
+            cust_inactive_count += 1
+
+    # Employees
+    employees = Employee.query.filter_by(status='Active').all()
+    for employee in employees:
+        attendance_exists = Attendance.query.filter(
+            Attendance.thumb_id == employee.thumb_id
+        ).first()
+        if not attendance_exists:
+            employee.status = 'Inactive'
+            emp_inactive_count += 1
+
+    db.session.commit()
+    flash(f"Marked {cust_inactive_count} customers and {emp_inactive_count} employees as Inactive (no attendance on record).", "success")
+    return redirect(url_for('dashboard'))
+
+# salary routes ==============
+
+@app.route('/pay_salary/<int:employee_id>', methods=['POST'])
+@login_required
+def pay_salary(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    salary_amount = float(request.form.get('salary_amount', 0))
+    payment_type = request.form.get('payment_type', 'Salary')
+    payment_method = request.form.get('payment_method', 'Cash')
+    transaction_id = request.form.get('transaction_id', None)
+    salary_entry = SalaryHistory(
+        employee_id=employee.id,
+        employee_name=employee.name,
+        salary_amount=salary_amount,
+        payment_type=payment_type,
+        payment_method=payment_method,
+        transaction_id=transaction_id if payment_method == 'Online' else None,
+        transaction_date=datetime.utcnow()
+    )
+    db.session.add(salary_entry)
+    db.session.commit()
+    flash('Salary record added!', 'success')
+    return redirect(url_for('manage_employee', employee_id=employee.id))
+
+# registration success page =======
+
+@app.route('/registration_success')
+def registration_success():
+    is_qr = request.args.get('mode') == 'qr'
+    return render_template('registration_success.html', is_qr=is_qr)
+
+# user loader for login manager =======
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
 
 if __name__ == '__main__':
     with app.app_context():
