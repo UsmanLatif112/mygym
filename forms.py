@@ -12,6 +12,10 @@ class LoginForm(FlaskForm):
 
 class CustomerForm(FlaskForm):
     name = StringField('Full Name', validators=[DataRequired(), Length(min=2, max=120)])
+    admission_date = DateField('Admission Date', format='%Y-%m-%d', validators=[DataRequired()])
+    package = SelectField('Package', choices=[], validators=[DataRequired()])
+    trainer = SelectField('Trainer', choices=[], validators=[DataRequired()])
+    training_type = SelectField('Training Type', choices=[('Individual', 'Individual'), ('Personal', 'Personal Training')], validators=[DataRequired()])
     father_or_husband = StringField('Father/Husband Name', validators=[DataRequired(), Length(min=2, max=120)])
     # cnic = StringField('CNIC', validators=[DataRequired(), Regexp(r'^[0-9]{14}$', message="Please enter a valid 13-digit CNIC"),Length(min=14, max=16)])
     cnic = StringField('CNIC', validators=[DataRequired()])
@@ -39,7 +43,7 @@ class CustomerForm(FlaskForm):
     marital_status = SelectField('Marital Status', choices=[('Married','Married'),('Single','Single'),('Other','Other')], validators=[DataRequired()])
     blood_group = SelectField('Blood Group', choices=[('A+','A+'),('A-','A-'),('B+','B+'),('B-','B-'),('O+','O+'),('O-','O-'),('AB+','AB+'),('AB-','AB-')], validators=[Optional()])
     dob = DateField('Date of Birth', validators=[DataRequired()], format='%Y-%m-%d')
-    height = FloatField('Height (cm)', validators=[DataRequired()])
+    height = FloatField('Height (cm)', validators=[Optional()])
     weight = FloatField('Weight (kg)', validators=[DataRequired()])
     waist = FloatField('Waist (cm)', validators=[Optional()])
     profession = StringField('Profession', validators=[Optional()])
@@ -47,14 +51,9 @@ class CustomerForm(FlaskForm):
     address = StringField('Address', validators=[DataRequired()])
     phone = StringField('Phone Number', validators=[DataRequired(), Length(min=11, max=14)])
     emergency_contact = StringField('Emergency Contact No', validators=[DataRequired(), Length(min=11, max=14)])
-    package = SelectField('Package', choices=[
-        ('Individual_Monthly','Individual - 1 Month'),
-        ('Individual_3Month','Individual - 3 Months'),
-        ('Individual_6Month','Individual - 6 Months'),
-        ('Personal_Monthly','Personal Training - 1 Month'),
-        ('Personal_3Month','Personal Training - 3 Months'),
-        ('Personal_6Month','Personal Training - 6 Months'),
-    ], validators=[DataRequired()])
+    # This is correct (choices get set in your route)
+    package = SelectField('Package', choices=[], validators=[DataRequired()])
+
     personal_training_time = StringField('Preferred Training Time', validators=[Optional()])
     trainer = SelectField('Trainer', choices=[('Trainer 1', 'Trainer 1'), ('Trainer 2','Trainer 2'), ('Trainer 3','Trainer 3')], validators=[Optional()])
     bmi_test = SelectField('BMI Test', choices=[('No', 'No'), ('Yes', 'Yes')], default='No', validators=[DataRequired()])

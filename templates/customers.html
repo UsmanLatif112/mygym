@@ -45,8 +45,14 @@
                     {% endif %}
                 </td>
                 <td>{{ c.membership_no }}</td>
-                <td>{{ c.type }}</td>
-                <td>{{ c.package.split('_')[1] if '_' in c.package else c.package }}</td>
+                <td>
+                    {% set pkg = packages_dict.get(c.package_id) %}
+                    {{ pkg.package_type if pkg else '' }}
+                    </td>
+                    <td>
+                    {% set pkg = packages_dict.get(c.package_id) %}
+                    {{ pkg.package_name if pkg else '' }}
+                    </td>
                 <td>{{ c.billing_date.strftime('%Y-%m-%d') }}</td> 
                 <td>
                     {% if c.status and c.status.lower() == 'active' %}

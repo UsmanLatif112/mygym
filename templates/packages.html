@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Packages</h1>
+
+<!-- Add package button, right-aligned -->
+<div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;">
+    <button class="leet-btn" onclick="openAddModal()" style="width:auto; padding:12px 26px; font-size:1em;">
+        <i class="fa fa-plus"></i> Add Package
+    </button>
+</div>
+
+<table style="width:100%; background:#232323; border-radius:8px; overflow:hidden;">
+    <thead>
+        <tr style="background:#181818; color:#ffb347;">
+            <th style="padding:12px;">Name</th>
+            <th style="padding:12px;">Type</th>
+            <th style="padding:12px;">Duration</th>
+            <th style="padding:12px;">Price</th>
+            <th style="padding:12px;">Registration Fees</th>
+            <th style="padding:12px;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pkg in packages %}
+        <tr style="text-align:center; border-bottom:1px solid #292929;">
+            <td style="padding:12px;">{{ pkg.package_name }}</td>
+            <td style="padding:12px;">{{ pkg.package_type }}</td>
+            <td style="padding:12px;">{{ pkg.package_duration }}</td>
+            <td style="padding:12px;">{{ pkg.package_price }}</td>
+            <td style="padding:12px;">{{ pkg.registration_fees }}</td>
+            <td style="padding:12px;">
+                <button 
+                  class="leet-btn" 
+                  style="padding:6px 18px; font-size:0.98em;"
+                  onclick="openUpdateModal({{ pkg.id }}, '{{ pkg.package_name }}', '{{ pkg.package_type }}', '{{ pkg.package_duration }}', '{{ pkg.package_price }}', '{{ pkg.registration_fees }}')">
+                  Update
+                </button>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" style="padding:18px; text-align:center;">No packages found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Add/Update Package Modal -->
+<div id="add-update-modal" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:#0008; z-index:9999;">
+    <div style="background:#232323; max-width:400px; margin:80px auto; padding:28px 32px 18px 32px; border-radius:12px; box-shadow:0 4px 32px #0007; position:relative;">
+        <h2 id="modal-title" style="color:#ff7300; margin-bottom:18px;">Add Package</h2>
+        <form id="package-form" autocomplete="off">
+            <input type="hidden" name="mode" id="form-mode" value="add">
+            <input type="hidden" name="package_id" id="package-id">
+            <div style="margin-bottom:13px;">
+                <label style="color:#ffb347; font-weight:600;">Name</label>
+                <input type="text" name="package_name" id="package-name" class="form-input" style="width:100%; margin-top:8px;" required>
+            </div>
+            <div style="margin-bottom:13px;">
+                <label style="color:#ffb347; font-weight:600;">Type</label>
+                <select name="package_type" id="package-type" class="form-input" style="width:100%;" required>
+                    <option value="Individual">Individual</option>
+                    <option value="Personal Training">Personal Training</option>
+                </select>
+            </div>
+            <div style="margin-bottom:13px;">
+                <label style="color:#ffb347; font-weight:600;">Duration</label>
+                <select name="package_duration" id="package-duration" class="form-input" style="width:100%;" required>
+                    <option value="1 Month">1 Month</option>
+                    <option value="3 Months">3 Months</option>
+                    <option value="6 Months">6 Months</option>
+                    <option value="1 Year">1 Year</option>
+                </select>
+            </div>
+            <div style="margin-bottom:13px;">
+                <label style="color:#ffb347; font-weight:600;">Price</label>
+                <input type="number" min="0" step="any" name="package_price" id="package-price" class="form-input" style="width:100%;" required>
+                <span id="price-error" style="color:red; display:none;">Please enter a valid number.</span>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="color:#ffb347; font-weight:600;">Registration Fees</label>
+                <input type="number" min="0" step="any" name="registration_fees" id="registration-fees" class="form-input" style="width:100%;" required>
+                <span id="fees-error" style="color:red; display:none;">Please enter a valid number.</span>
+            </div>
+            <div id="modal-message" style="color:#ffb347; margin-bottom:8px;"></div>
+            <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+                <button type="button" class="leet-btn" style="background:#444; color:#fff;" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="leet-btn" id="modal-submit-btn">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('modal-title').innerText = 'Add Package';
+    document.getElementById('form-mode').value = 'add';
+    document.getElementById('package-id').value = '';
+    document.getElementById('package-name').value = '';
+    document.getElementById('package-type').value = 'Individual';
+    document.getElementById('package-duration').value = '1 Month';
+    document.getElementById('package-price').value = '';
+    document.getElementById('registration-fees').value = '';
+    document.getElementById('modal-submit-btn').innerText = 'Add';
+    document.getElementById('modal-message').innerText = '';
+    document.getElementById('add-update-modal').style.display = 'block';
+    document.getElementById('price-error').style.display = 'none';
+    document.getElementById('fees-error').style.display = 'none';
+}
+
+function openUpdateModal(id, name, type, duration, price, regfees) {
+    document.getElementById('modal-title').innerText = 'Update Package';
+    document.getElementById('form-mode').value = 'update';
+    document.getElementById('package-id').value = id;
+    document.getElementById('package-name').value = name;
+    document.getElementById('package-type').value = type;
+    document.getElementById('package-duration').value = duration;
+    document.getElementById('package-price').value = price;
+    document.getElementById('registration-fees').value = regfees;
+    document.getElementById('modal-submit-btn').innerText = 'Update';
+    document.getElementById('modal-message').innerText = '';
+    document.getElementById('add-update-modal').style.display = 'block';
+    document.getElementById('price-error').style.display = 'none';
+    document.getElementById('fees-error').style.display = 'none';
+}
+
+function closeModal() {
+    document.getElementById('add-update-modal').style.display = 'none';
+}
+
+document.getElementById('add-update-modal').onclick = function(e) {
+    if (e.target === this) closeModal();
+}
+
+// AJAX form submit with validation
+document.getElementById('package-form').onsubmit = function(e) {
+    e.preventDefault();
+    var priceInput = document.getElementById('package-price');
+    var feesInput = document.getElementById('registration-fees');
+    var priceValue = priceInput.value.trim();
+    var feesValue = feesInput.value.trim();
+    var priceError = document.getElementById('price-error');
+    var feesError = document.getElementById('fees-error');
+
+    // Validation for numeric values
+    var valid = true;
+    
+    if (priceValue === "" || isNaN(priceValue) || Number(priceValue) < 0) {
+        priceError.style.display = 'block';
+        valid = false;
+    } else {
+        priceError.style.display = 'none';
+    }
+
+    if (feesValue === "" || isNaN(feesValue) || Number(feesValue) < 0) {
+        feesError.style.display = 'block';
+        valid = false;
+    } else {
+        feesError.style.display = 'none';
+    }
+
+    if (!valid) return false;
+
+    // AJAX submit if validation passes
+    var formData = new FormData(this);
+    fetch('{{ url_for("packages") }}', {
+        method: 'POST',
+        body: formData,
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    }).then(response => response.json()).then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            document.getElementById('modal-message').innerText = data.message || 'Error!';
+        }
+    });
+};
+</script>
+
+<style>
+.toast-error,
+.toast-success {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+.toast-error { background: #d90429; }
+.toast-success { background: #36b37e; }
+
+@keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
+@keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+</style>
+
+{% endblock %}

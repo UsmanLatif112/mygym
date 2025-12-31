@@ -13,9 +13,12 @@
             <span class="readonly-field">{{ customer.membership_no }}</span>
         </div>
         <div class="form-block">
-            <label>Admission Date:</label>
-            <span class="readonly-field">{{ customer.admission_date.strftime('%Y-%m-%d') if customer.admission_date else '' }}</span>
-        </div>
+    <label for="admission_date">Admission Date</label>
+    {{ form.admission_date(class_="form-input", id="admission_date", type="date") }}
+    {% for error in form.admission_date.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
 
         <div class="form-block">
             <label for="name">Full Name</label>
@@ -130,33 +133,48 @@
             {% endfor %}
         </div>
         <div class="form-block">
-            <label for="package">Package</label>
-            {{ form.package(class_="form-input", id="package") }}
-            {% for error in form.package.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-        </div>
-        <div class="form-block" id="personal_training_time_row" style="display:none;">
-            <label for="trainer">Trainer</label>
-            <select name="trainer" class="form-input" id="trainer">
-                <option value="">Select Trainer</option>
-                {% for t in trainers %}
-                    <option value="{{ t.name }}"
-                        data-timing="{{ t.timing or '' }}"
-                        {% if form.trainer.data == t.name %}selected{% endif %}
-                    >{{ t.name }}</option>
-                {% endfor %}
-            </select>
-            {% for error in form.trainer.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
+    <label for="training_type">Training Type</label>
+    {{ form.training_type(class_="form-input", id="training_type") }}
+    {% for error in form.training_type.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
 
-            <label for="personal_training_time">Preferred Training Time</label>
-            {{ form.personal_training_time(class_="form-input", id="personal_training_time", readonly=True) }}
-            {% for error in form.personal_training_time.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-        </div>
+<div class="form-block">
+    <label for="package">Package</label>
+    <select name="package" class="form-input" id="package">
+        {% set current_choices = individual_packages if form.training_type.data != 'Personal' else personal_packages %}
+        {% for val, label in current_choices %}
+            <option value="{{ val }}" {% if form.package.data == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% for error in form.package.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
+
+<div class="form-block" id="personal_training_time_row" style="display:none;">
+    <label for="trainer">Trainer</label>
+    <select name="trainer" class="form-input" id="trainer">
+        <option value="">Select Trainer</option>
+        {% for t in trainers %}
+            <option value="{{ t.name }}"
+                data-timing="{{ t.timing or '' }}"
+                {% if form.trainer.data == t.name %}selected{% endif %}
+            >{{ t.name }}</option>
+        {% endfor %}
+    </select>
+    {% for error in form.trainer.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+
+    <label for="personal_training_time">Preferred Training Time</label>
+    {{ form.personal_training_time(class_="form-input", id="personal_training_time", readonly=True) }}
+    {% for error in form.personal_training_time.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
+
 
 
         <div class="form-block">
@@ -296,4 +314,59 @@ document.addEventListener('DOMContentLoaded', function() {
     }).trigger('change');
   });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var trainingTypeSelect = document.getElementById('training_type');
+    var packageSelect = document.getElementById('package');
+    var trainerRow = document.getElementById('personal_training_time_row');
+    var individualPackages = {{ individual_packages|tojson }};
+    var personalPackages = {{ personal_packages|tojson }};
+
+    function updatePackageOptions() {
+        var type = trainingTypeSelect.value;
+        var options = (type === 'Personal') ? personalPackages : individualPackages;
+        packageSelect.innerHTML = '';
+        options.forEach(function(pkg) {
+            var opt = document.createElement('option');
+            opt.value = pkg[0];
+            opt.textContent = pkg[1];
+            packageSelect.appendChild(opt);
+        });
+        // Set value to match form.package.data or first option
+        var selected = "{{ form.package.data }}";
+        if (selected && options.find(p => p[0] === selected)) {
+            packageSelect.value = selected;
+        } else if (options.length > 0) {
+            packageSelect.value = options[0][0];
+        }
+    }
+    function toggleTrainerField() {
+        if (trainingTypeSelect.value === 'Personal') {
+            trainerRow.style.display = 'block';
+        } else {
+            trainerRow.style.display = 'none';
+        }
+    }
+    trainingTypeSelect.addEventListener('change', function() {
+        updatePackageOptions();
+        toggleTrainerField();
+    });
+    updatePackageOptions();
+    toggleTrainerField();
+
+    // Trainer timing autofill
+    var trainerSelect = document.getElementById('trainer');
+    var timeInput = document.getElementById('personal_training_time');
+    if (trainerSelect && timeInput) {
+        function syncTime() {
+            var selectedOption = trainerSelect.options[trainerSelect.selectedIndex];
+            var timing = selectedOption ? selectedOption.getAttribute('data-timing') : '';
+            timeInput.value = timing || '';
+        }
+        trainerSelect.addEventListener('change', syncTime);
+        syncTime();
+    }
+});
+</script>
+
 {% endblock %}

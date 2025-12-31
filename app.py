@@ -70,6 +70,10 @@ def edit_employee(employee_id):
     return redirect(url_for('manage_employee', employee_id=employee.id))
 
 
+@app.route('/registration_success')
+def registration_success():
+    is_qr = request.args.get('mode') == 'qr'
+    return render_template('registration_success.html', is_qr=is_qr)
 
 
 
@@ -146,10 +150,15 @@ def customers():
             )
         )
     customers_list = query.all()
+    # Fetch all packages and create a dict for quick lookup
+    packages = Packages.query.all()
+    packages_dict = {p.id: p for p in packages}
     from flask import get_flashed_messages
     messages = get_flashed_messages(with_categories=True)
-    print("Flashed messages:", messages)   # <-- See in terminal
-    return render_template("customers.html", customers=customers_list)
+    print("Flashed messages:", messages)
+    # Pass packages_dict to the template
+    return render_template("customers.html", customers=customers_list, packages_dict=packages_dict)
+
 
 @app.route('/logout')
 @login_required
@@ -210,17 +219,7 @@ def add_employee():
         flash('Error adding employee. Please check your input.', 'danger')
     return redirect(url_for('employees'))
 
-# @app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
-# @login_required
-# def delete_employee(employee_id):
-#     if str(current_user.role_id) != '1':
-#         return abort(403)
-#     # You may want to check permissions here (e.g. role_id)
-#     employee = Employee.query.get_or_404(employee_id)
-#     db.session.delete(employee)
-#     db.session.commit()
-#     flash('Employee deleted successfully!', 'success')
-#     return redirect(url_for('employees'))
+
 
 
 @app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
@@ -235,36 +234,154 @@ def delete_employee(employee_id):
     return redirect(url_for('employees'))
 
 
+# @app.route('/add_customer', methods=['GET', 'POST'])
+# @login_required
+# def add_customer():
+#     form = CustomerForm()
+#     membership_no = generate_membership_no()
+
+#     # Fetch all packages and group by type
+#     all_packages = Packages.query.all()
+#     individual_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Individual']
+#     personal_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Personal Training']
+
+#     trainers = Employee.query.filter_by(employment_type='Trainer').all()
+#     form.trainer.choices = [(t.name, t.name) for t in trainers]
+
+#     # Set defaults for first load
+#     if request.method == 'GET':
+#         form.training_type.data = 'Individual'
+#         if individual_packages:
+#             form.package.data = individual_packages[0][0]
+#     # On POST, set choices based on selected training type
+#     elif request.method == 'POST':
+#         if form.training_type.data == 'Personal':
+#             form.package.choices = personal_packages
+#         else:
+#             form.package.choices = individual_packages
+
+#     # Always set package choices for current state
+#     if form.training_type.data == 'Personal':
+#         form.package.choices = personal_packages
+#     else:
+#         form.package.choices = individual_packages
+
+#     if form.validate_on_submit():
+#         admission_date = form.admission_date.data
+#         package_id = int(form.package.data)
+#         package_obj = Packages.query.get(package_id)
+#         billing_date = get_billing_date(admission_date, package_obj.package_duration)
+#         customer_type = form.training_type.data
+
+#         if customer_type == 'Individual':
+#             trainer = None
+#             personal_training_time = None
+#         else:
+#             trainer = form.trainer.data
+#             personal_training_time = form.personal_training_time.data
+
+#         customer = Customer(
+#             membership_no=membership_no,
+#             status="Not Paid",
+#             type=customer_type,
+#             admission_date=admission_date,
+#             billing_date=billing_date,
+#             package_id=package_id,
+#             name=form.name.data,
+#             father_or_husband=form.father_or_husband.data,
+#             cnic=form.cnic.data,
+#             email=form.email.data,
+#             gender=form.gender.data,
+#             marital_status=form.marital_status.data,
+#             blood_group=form.blood_group.data,
+#             dob=form.dob.data,
+#             height=parse_float(form.height.data),
+#             weight=parse_float(form.weight.data),
+#             waist=parse_float(form.waist.data),
+#             profession=form.profession.data,
+#             nationality=form.nationality.data,
+#             address=form.address.data,
+#             phone=form.phone.data,
+#             emergency_contact=form.emergency_contact.data,
+#             personal_training_time=personal_training_time,
+#             trainer=trainer,
+#             bmi_test=form.bmi_test.data,
+#             bmi_value=parse_float(form.bmi_value.data),
+#             illnesses=parse_tagify(form.illnesses.data),
+#             join_reasons=parse_tagify(form.join_reasons.data),
+#             terms_accepted=form.terms_accepted.data
+#         )
+#         db.session.add(customer)
+#         db.session.commit()
+#         flash("Customer added successfully!", "success")
+#         return redirect(url_for('customers'))
+
+#     if not form.admission_date.data:
+#         form.admission_date.data = datetime.now().date()
+
+#     return render_template(
+#         'add_customer.html',
+#         form=form,
+#         membership_no=membership_no,
+#         trainers=trainers,
+#         admission_date=form.admission_date.data,
+#         individual_packages=individual_packages,
+#         personal_packages=personal_packages
+#     )
+
 @app.route('/add_customer', methods=['GET', 'POST'])
-@login_required
 def add_customer():
     form = CustomerForm()
     membership_no = generate_membership_no()
-    admission_date = datetime.now().date()
-    billing_date = get_billing_date(admission_date, form.package.data)
-    customer_type = get_customer_type(form.package.data)
-    package = form.package.data
+
+    # Determine if this registration is from a QR code
+    is_qr = request.args.get('mode') == 'qr'
+
+    # Fetch packages and trainers as before
+    all_packages = Packages.query.all()
+    individual_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Individual']
+    personal_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Personal Training']
+
     trainers = Employee.query.filter_by(employment_type='Trainer').all()
-    # Set trainer choices for the form
     form.trainer.choices = [(t.name, t.name) for t in trainers]
-    
-    if package and package.startswith('Individual'):    
-        trainer = None  # or '' if your DB prefers empty string
-        personal_training_time = None
+
+    # Set package choices based on training type
+    if request.method == 'GET':
+        form.training_type.data = 'Individual'
+        if individual_packages:
+            form.package.data = individual_packages[0][0]
+    elif request.method == 'POST':
+        if form.training_type.data == 'Personal':
+            form.package.choices = personal_packages
+        else:
+            form.package.choices = individual_packages
+
+    if form.training_type.data == 'Personal':
+        form.package.choices = personal_packages
     else:
-        trainer = form.trainer.data
-        personal_training_time = form.personal_training_time.data
+        form.package.choices = individual_packages
 
     if form.validate_on_submit():
-        illnesses = parse_tagify(form.illnesses.data)
-        join_reasons = parse_tagify(form.join_reasons.data)
+        admission_date = form.admission_date.data
+        package_id = int(form.package.data)
+        package_obj = Packages.query.get(package_id)
+        billing_date = get_billing_date(admission_date, package_obj.package_duration)
+        customer_type = form.training_type.data
+
+        if customer_type == 'Individual':
+            trainer = None
+            personal_training_time = None
+        else:
+            trainer = form.trainer.data
+            personal_training_time = form.personal_training_time.data
 
         customer = Customer(
             membership_no=membership_no,
             status="Not Paid",
-            type=customer_type, 
+            type=customer_type,
             admission_date=admission_date,
             billing_date=billing_date,
+            package_id=package_id,
             name=form.name.data,
             father_or_husband=form.father_or_husband.data,
             cnic=form.cnic.data,
@@ -281,28 +398,36 @@ def add_customer():
             address=form.address.data,
             phone=form.phone.data,
             emergency_contact=form.emergency_contact.data,
-            package=package,
             personal_training_time=personal_training_time,
             trainer=trainer,
             bmi_test=form.bmi_test.data,
             bmi_value=parse_float(form.bmi_value.data),
-            illnesses=illnesses,
-            join_reasons=join_reasons,
+            illnesses=parse_tagify(form.illnesses.data),
+            join_reasons=parse_tagify(form.join_reasons.data),
             terms_accepted=form.terms_accepted.data
         )
         db.session.add(customer)
         db.session.commit()
-        print(f"User {customer.name} added successfully!")
-        flash("Customer added successfully!", "success")
-        return redirect(url_for('customers'))
+        if is_qr:
+            return redirect(url_for('registration_success', mode='qr'))
+        else:
+            flash("Customer added successfully!", "success")
+            return redirect(url_for('customers'))
+
+    if not form.admission_date.data:
+        form.admission_date.data = datetime.now().date()
 
     return render_template(
         'add_customer.html',
         form=form,
         membership_no=membership_no,
         trainers=trainers,
-        admission_date=admission_date
+        admission_date=form.admission_date.data,
+        individual_packages=individual_packages,
+        personal_packages=personal_packages,
+        is_qr=is_qr
     )
+
 
 @app.route('/terms')
 def terms():
@@ -341,23 +466,28 @@ def manage_employee(employee_id):
 def manage_customer(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
     employees = Employee.query.order_by(Employee.name).all()
-    # Find the matching package price
-    package_obj = Packages.query.filter_by(package_name=customer.package).first()
-    amount_to_be_paid = int(package_obj.package_price) if package_obj else 0
+    packages = Packages.query.all()
+    packages_dict = {p.id: p for p in packages}
 
-    # (You can also calculate paid_amount and remaining_amount if you track payments)
-    paid_amount = 0
-    remaining_amount = amount_to_be_paid - paid_amount
+    # Get the actual package object for this customer (using package_id)
+    pkg = packages_dict.get(customer.package_id)
+    package_name = pkg.package_name if pkg else ''
+    package_price = float(pkg.package_price) if pkg and pkg.package_price else 0
+    registration_fees = float(pkg.registration_fees) if pkg and pkg.registration_fees else 0
+    amount_to_be_paid = package_price + registration_fees
 
     return render_template(
         "manage_customer.html",
         customer=customer,
+        packages_dict=packages_dict,
+        package_name=package_name,
+        package_price=package_price,
+        registration_fees=registration_fees,
         amount_to_be_paid=amount_to_be_paid,
-        remaining_amount=remaining_amount,
         employees=employees,
-        paid_amount=paid_amount
-        
     )
+
+
 
 @app.route('/edit_customer/<cnic>', methods=['GET', 'POST'])
 @login_required
@@ -365,15 +495,27 @@ def edit_customer(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
     form = CustomerForm(obj=customer)
     trainers = Employee.query.filter_by(employment_type='Trainer').all()
-    form.trainer.choices = [('', 'Select Trainer')] + [(t.name, t.name) for t in trainers]
+    form.trainer.choices = [(t.name, t.name) for t in trainers]
+
+    # Fetch all packages for dropdowns (by type)
+    all_packages = Packages.query.all()
+    individual_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Individual']
+    personal_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Personal Training']
     form._current_customer = customer
-    customer.package = form.package.data
-    if customer.package.startswith('Individual'):
-        customer.trainer = None
-        customer.personal_training_time = None
+
+    # Determine type for initial render (GET or POST with errors)
+    training_type = form.training_type.data or customer.type or 'Individual'
+    if training_type == 'Personal':
+        form.package.choices = personal_packages
     else:
-        customer.trainer = form.trainer.data
-        customer.personal_training_time = form.personal_training_time.data
+        form.package.choices = individual_packages
+
+    # On POST, update package choices based on selected type
+    if request.method == 'POST':
+        if form.training_type.data == 'Personal':
+            form.package.choices = personal_packages
+        else:
+            form.package.choices = individual_packages
 
     if form.validate_on_submit():
         customer.name = form.name.data
@@ -384,6 +526,9 @@ def edit_customer(cnic):
         customer.marital_status = form.marital_status.data
         customer.blood_group = form.blood_group.data
         customer.dob = form.dob.data
+        # Fetch the selected package object
+        package_id = int(form.package.data)
+        package_obj = Packages.query.get(package_id)
 
         # Float fields - always parse!
         customer.height = parse_float(form.height.data)
@@ -396,36 +541,40 @@ def edit_customer(cnic):
         customer.address = form.address.data
         customer.phone = form.phone.data
         customer.emergency_contact = form.emergency_contact.data
-        customer.package = customer.package
-        customer.personal_training_time = customer.personal_training_time
-        customer.trainer = customer.trainer
-        customer.bmi_test = form.bmi_test.data
 
-        # Tagify fields - parse as comma-separated string
+        # Update package and type
+        customer.type = form.training_type.data
+        customer.package_id = int(form.package.data)
+        customer.admission_date = form.admission_date.data
+        customer.billing_date = get_billing_date(customer.admission_date, package_obj.package_duration)
+
+        # Trainer logic
+        if customer.type == 'Individual':
+            customer.trainer = None
+            customer.personal_training_time = None
+        else:
+            customer.trainer = form.trainer.data
+            customer.personal_training_time = form.personal_training_time.data
+
+        customer.bmi_test = form.bmi_test.data
         customer.illnesses = parse_tagify(form.illnesses.data)
         customer.join_reasons = parse_tagify(form.join_reasons.data)
-
-        # Terms accepted (checkbox)
         customer.terms_accepted = form.terms_accepted.data
 
         db.session.commit()
         flash("Customer updated successfully!", "success")
         return redirect(url_for('manage_customer', cnic=customer.cnic))
 
-
-    return render_template('edit_customer.html', form=form, customer=customer, trainers=trainers, edit_mode=True)
-
-
-
-# @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
-# @login_required
-# def delete_customer(cnic):
-#     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-#     db.session.delete(customer)
-#     db.session.commit()
-#     flash("Customer deleted successfully!", "success")
-#     return redirect(url_for('customers'))
-
+    # Pass package lists for JS
+    return render_template(
+        'edit_customer.html',
+        form=form,
+        customer=customer,
+        trainers=trainers,
+        individual_packages=individual_packages,
+        personal_packages=personal_packages,
+        edit_mode=True
+    )
 
 @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
 @login_required
@@ -440,22 +589,31 @@ def delete_customer(cnic):
 @login_required
 def update_status(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+    # Always use package_id and fetch the package object!
+    package_obj = Packages.query.get(customer.package_id)
 
-    package_obj = Packages.query.filter_by(package_name=customer.package).first()
-    amount_to_be_paid = float(package_obj.package_price) if package_obj and package_obj.package_price else 0
+    package_price = float(package_obj.package_price) if package_obj and package_obj.package_price else 0
+    registration_fees = float(request.form.get('registration_fees', 0))
+    total_amount = package_price + registration_fees
 
     paid_amount = float(request.form.get('paid_amount', 0))
-    remaining_amount = amount_to_be_paid - paid_amount
+    remaining_amount = total_amount - paid_amount
+    next_billing_date = request.form.get('next_billing_date')
     payment_collected_by = request.form.get('collector_name')
     payment_method = request.form.get('payment_method', 'Unknown')
     transaction_id = request.form.get('transaction_id', None)
+
+    # Update customer billing date and status
+    if next_billing_date:
+        customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
+    customer.status = 'Active'
 
     # Save billing record
     billing = Billing(
         customer_name=customer.name,
         membership_no=customer.membership_no,
         customer_cnic=customer.cnic,
-        paid_to_be_amount=amount_to_be_paid,
+        paid_to_be_amount=total_amount,  # total package amount
         paid_amount=paid_amount,
         remaining_amount=remaining_amount,
         payment_collected_by=payment_collected_by,
@@ -470,22 +628,20 @@ def update_status(cnic):
         customer_cnic=customer.cnic,
         customer_name=customer.name,
         membership_no=customer.membership_no,
-        amount_to_be_paid=amount_to_be_paid,
-        paid_amount=paid_amount,
-        remaining_amount=remaining_amount,
+        amount_to_be_paid=total_amount,      # total package amount
+        paid_amount=paid_amount,             # paid this time
+        remaining_amount=remaining_amount,   # remaining after this payment
         payment_collected_by=payment_collected_by,
         payment_method=payment_method,
         transaction_id=transaction_id if transaction_id else None,
-        payment_date=datetime.utcnow()
+        payment_date=datetime.utcnow()       # payment date/time
     )
     db.session.add(billing_history)
-
-    # Update customer status
-    customer.status = 'Active'
     db.session.commit()
 
     flash('Status and payment updated successfully.', 'success')
     return redirect(url_for('manage_customer', cnic=customer.cnic))
+
 
 
 @app.route('/mark_absent_inactive')
@@ -530,11 +686,11 @@ def customer_billing(cnic):
     billings = Billing.query.filter_by(membership_no=cnic).order_by(Billing.payment_date.desc()).all()
     return render_template('billing_history.html', billings=billings)
 
+
+
 @app.route('/billing')
 @login_required
 def billing():
-    if str(current_user.role_id) != '1':
-        abort(403)
     billed_cnic = db.session.query(Billing.customer_cnic).distinct()
     billed_membership = db.session.query(Billing.membership_no).distinct()
     customers = Customer.query.filter(
@@ -542,9 +698,8 @@ def billing():
     ).all()
 
     packages = Packages.query.all()
-    packages_dict = {p.package_name: p for p in packages}
+    packages_dict = {p.id: p for p in packages}
 
-    # Fetch latest billing record for each customer
     billing_dict = {}
     for c in customers:
         billing = Billing.query.filter_by(customer_cnic=c.cnic).order_by(Billing.payment_date.desc()).first()
@@ -556,6 +711,8 @@ def billing():
         packages_dict=packages_dict,
         billing_dict=billing_dict
     )
+
+
 
 
 
@@ -647,44 +804,39 @@ def accounts():
         custom_end=custom_end
     )
 
-
 @app.route('/billing_history/<cnic>', methods=['GET'])
 @login_required
 def billing_history(cnic):
-    if str(current_user.role_id) != '1':
-        abort(403)
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-    history = BillingHistory.query.filter_by(customer_cnic=cnic).order_by(BillingHistory.payment_date.desc()).all()
     employees = Employee.query.all()
-    packages = Packages.query.all()
-    packages_dict = {p.package_name: p for p in packages}
+    pkg = Packages.query.get(customer.package_id)
+    package_price = float(pkg.package_price) if pkg and pkg.package_price else 0
 
-    # get last remain
-    last_billing = history[0] if history else None
-    prev_remain = last_billing.remaining_amount if last_billing else 0
-    package_obj = packages_dict.get(customer.package)
-    package_price = float(package_obj.package_price) if package_obj else 0
-    amount_to_be_paid = package_price + prev_remain
+    # Get "current" remaining from Billing table (single row per customer)
+    billing = Billing.query.filter_by(customer_cnic=customer.cnic).order_by(Billing.payment_date.desc()).first()
+    previous_remaining = billing.remaining_amount if billing else 0
+    current_balance = billing.remaining_amount if billing else 0
+    amount_to_be_paid = package_price + previous_remaining
 
-    total_remaining = history[0].remaining_amount if history else 0
+    history = BillingHistory.query.filter_by(customer_cnic=cnic).order_by(BillingHistory.payment_date.desc()).all()
 
     return render_template(
         'billing_history.html',
         customer=customer,
         history=history,
-        now=datetime.utcnow(),
         employees=employees,
-        packages_dict=packages_dict,
-        total_remaining=total_remaining,
-        amount_to_be_paid=amount_to_be_paid
+        current_balance=current_balance,
+        package_name=pkg.package_name if pkg else '',
+        package_price=package_price,
+        previous_remaining=previous_remaining,
+        amount_to_be_paid=amount_to_be_paid,
     )
+
 
 
 @app.route('/delete_billing_history/<int:billing_id>/<cnic>', methods=['POST'])
 @login_required
 def delete_billing_history(billing_id, cnic):
-    if str(current_user.role_id) != '1':
-        abort(403)
     history = BillingHistory.query.get_or_404(billing_id)
     db.session.delete(history)
     db.session.commit()
@@ -694,45 +846,31 @@ def delete_billing_history(billing_id, cnic):
 @app.route('/add_billing_history/<cnic>', methods=['POST'])
 @login_required
 def add_billing_history(cnic):
-    if str(current_user.role_id) != '1':
-        abort(403)
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-
-    # Get last remaining from BillingHistory
-    last_billing = BillingHistory.query.filter_by(customer_cnic=customer.cnic).order_by(BillingHistory.payment_date.desc()).first()
-    prev_remain = last_billing.remaining_amount if last_billing else 0
-
-    # Get package price
-    package_obj = Packages.query.filter_by(package_name=customer.package).first()
-    package_price = float(package_obj.package_price) if package_obj else 0
-
-    # Rolling amount to be paid
-    amount_to_be_paid = package_price + prev_remain
+    pkg = Packages.query.get(customer.package_id)
+    package_price = float(pkg.package_price) if pkg and pkg.package_price else 0
+    billing = Billing.query.filter_by(customer_cnic=customer.cnic).order_by(Billing.payment_date.desc()).first()
+    previous_remaining = billing.remaining_amount if billing else 0
+    amount_to_be_paid = package_price + previous_remaining
     paid_amount = float(request.form.get('paid_amount', 0))
-    remaining_amount = amount_to_be_paid - paid_amount
+    new_remaining = max(amount_to_be_paid - paid_amount, 0)
 
-    payment_collected_by = request.form.get('payment_collected_by')
-    payment_method = request.form.get('payment_method', 'Unknown')
-    transaction_id = request.form.get('transaction_id', None)
-    payment_date = datetime.utcnow()
-
-    # 1. Add to BillingHistory
+    # Save new BillingHistory entry
     billing_history = BillingHistory(
         customer_cnic=customer.cnic,
         customer_name=customer.name,
         membership_no=customer.membership_no,
         amount_to_be_paid=amount_to_be_paid,
         paid_amount=paid_amount,
-        remaining_amount=remaining_amount,
-        payment_collected_by=payment_collected_by,
-        payment_method=payment_method,
-        transaction_id=transaction_id if transaction_id else None,
-        payment_date=payment_date
+        remaining_amount=new_remaining,
+        payment_collected_by=request.form.get('payment_collected_by'),
+        payment_method=request.form.get('payment_method', 'Unknown'),
+        transaction_id=request.form.get('transaction_id', None),
+        payment_date=datetime.utcnow()
     )
     db.session.add(billing_history)
 
-    # 2. Update or create Billing record
-    billing = Billing.query.filter_by(customer_cnic=customer.cnic).first()
+    # Update or create Billing entry (for statement/balance)
     if not billing:
         billing = Billing(
             customer_name=customer.name,
@@ -740,24 +878,21 @@ def add_billing_history(cnic):
             customer_cnic=customer.cnic,
             paid_to_be_amount=amount_to_be_paid,
             paid_amount=paid_amount,
-            remaining_amount=remaining_amount,
-            payment_collected_by=payment_collected_by,
-            payment_method=payment_method,
-            transaction_id=transaction_id if transaction_id else None,
-            payment_date=payment_date
+            remaining_amount=new_remaining,
+            payment_collected_by=request.form.get('payment_collected_by'),
+            payment_method=request.form.get('payment_method', 'Unknown'),
+            transaction_id=request.form.get('transaction_id', None),
+            payment_date=datetime.utcnow()
         )
         db.session.add(billing)
     else:
-        billing.customer_name = customer.name
-        billing.membership_no = customer.membership_no
         billing.paid_to_be_amount = amount_to_be_paid
         billing.paid_amount = paid_amount
-        billing.remaining_amount = remaining_amount
-        billing.payment_collected_by = payment_collected_by
-        billing.payment_method = payment_method
-        billing.transaction_id = transaction_id if transaction_id else None
-        billing.payment_date = payment_date
-        # No need to add to session, it's already tracked
+        billing.remaining_amount = new_remaining
+        billing.payment_collected_by = request.form.get('payment_collected_by')
+        billing.payment_method = request.form.get('payment_method', 'Unknown')
+        billing.transaction_id = request.form.get('transaction_id', None)
+        billing.payment_date = datetime.utcnow()
 
     db.session.commit()
     flash('Payment added to billing history!', 'success')
@@ -827,6 +962,54 @@ def pay_salary(employee_id):
     flash('Salary record added!', 'success')
     return redirect(url_for('manage_employee', employee_id=employee.id))
 
+@app.route('/packages', methods=['GET', 'POST'])
+@login_required
+def packages():
+    all_packages = Packages.query.order_by(Packages.id.desc()).all()
+
+    if request.method == 'POST':
+        mode = request.form.get('mode')
+        name = request.form.get('package_name')
+        package_type = request.form.get('package_type')
+        duration = request.form.get('package_duration')
+        price = request.form.get('package_price')
+        registration_fees = request.form.get('registration_fees')
+
+        if not (name and package_type and duration and price and registration_fees):
+            return jsonify({'success': False, 'message': 'All fields are required.'})
+
+        try:
+            price = float(price)
+            registration_fees = float(registration_fees)
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Price and Registration Fees must be valid numbers.'})
+
+        if mode == 'add':
+            new_package = Packages(
+                package_name=name,
+                package_type=package_type,
+                package_duration=duration,
+                package_price=price,
+                registration_fees=registration_fees
+            )
+            db.session.add(new_package)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Package added successfully.'})
+
+        elif mode == 'update':
+            package_id = request.form.get('package_id')
+            package = Packages.query.get(package_id)
+            if not package:
+                return jsonify({'success': False, 'message': 'Package not found.'})
+            package.package_name = name
+            package.package_type = package_type
+            package.package_duration = duration
+            package.package_price = price
+            package.registration_fees = registration_fees
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Package updated successfully.'})
+
+    return render_template('packages.html', packages=all_packages)
 
 
 if __name__ == '__main__':

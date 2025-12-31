@@ -16,11 +16,9 @@
 <div style="font-size: 0.98em; margin-bottom: 10px; color: #fff;">
     Billing Date: <span style="color:#ffb347; font-weight:600;">{{ customer.billing_date }}</span>
 </div>
-{% if total_remaining > 0 %}
-<div style="font-size: 0.98em; margin-bottom: 25px; color: #fff;">
-    Total Remaining Due: <span style="color:#ffb347; font-weight:600;">{{ total_remaining }}</span>
+<div style="font-size: 0.98em; margin-bottom: 10px; color: #fff;">
+    Remaining Amount: <span style="color:#ffb347; font-weight:600;">{{ current_balance }}</span>
 </div>
-{% endif %}
 <div style="text-align: right; margin-bottom: 26px;">
   <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="openAddPaymentModal()">
       <i class="fa fa-plus"></i> Add Payment
@@ -55,7 +53,6 @@
                     <span style="color:#aaa;">None</span>
                 {% endif %}
             </td>
-            
             <td>
             {% if b.payment_collected_by and b.payment_collected_by|length > 12 %}
                 <span title="{{ b.payment_collected_by }}">{{ b.payment_collected_by[:12] }}&hellip;</span>
@@ -65,7 +62,7 @@
             </td>
             <td>
                 <form method="POST" action="{{ url_for('delete_billing_history', billing_id=b.id, cnic=customer.cnic) }}" style="display:inline;">
-                    <button type="submit" class="leet-btn delete-btn" style="padding: 8px 8px; font-size:0.9em;">
+                    <button type="submit" class="leet-btn delete-btn" style="padding: 6px 6px; font-size:0.9em;">
                         <i class="fa fa-trash"></i>
                     </button>
                 </form>
@@ -77,7 +74,7 @@
         </tr>
         {% endfor %}
     </tbody>
-</table>    
+</table>
 </div>
 
 <div id="addPaymentModal" class="modal-overlay" style="display:none;">
@@ -94,12 +91,11 @@
       </div>
       <div class="form-block">
         <label>Package:</label>
-        <input type="text" value="{{ customer.package }}" readonly class="form-input">
+        <input type="text" value="{{ package_name }}" readonly class="form-input">
       </div>
       <div class="form-block">
         <label>Amount to be Paid:</label>
-        <input type="number" min="0" step="1" id="modal_amount_to_be_paid" name="amount_to_be_paid"
-       value="{{ amount_to_be_paid }}" readonly class="form-input">
+        <input type="number" min="0" step="1" id="modal_amount_to_be_paid" value="{{ amount_to_be_paid }}" readonly class="form-input">
       </div>
       <div class="form-block">
         <label>Paid Amount:</label>
@@ -107,16 +103,7 @@
       </div>
       <div class="form-block">
         <label>Remaining Amount:</label>
-        <input type="number" id="modal_remaining_amount" name="remaining_amount" class="form-input" readonly>
-      </div>
-      <div class="form-block">
-        <label>Collector Name:</label>
-        <select name="payment_collected_by" class="form-input" required>
-            <option value="">Select Employee</option>
-            {% for emp in employees %}
-                <option value="{{ emp.name }}">{{ emp.name }}</option>
-            {% endfor %}
-        </select>
+        <input type="number" id="modal_remaining_fees" class="form-input" value="{{ amount_to_be_paid }}" readonly>
       </div>
       <div class="form-block">
         <label>Payment Method:</label>
@@ -130,6 +117,15 @@
         <label>Transaction ID:</label>
         <input type="text" name="transaction_id" id="modal_transaction_id" class="form-input">
       </div>
+      <div class="form-block">
+        <label>Payment Collected By:</label>
+        <select name="payment_collected_by" class="form-input" required>
+            <option value="">Select Employee</option>
+            {% for emp in employees %}
+                <option value="{{ emp.name }}">{{ emp.name }}</option>
+            {% endfor %}
+        </select>
+      </div>
       <div class="form-block" style="display: flex; gap: 10px;">
         <button type="submit" class="leet-btn">Save Payment</button>
         <button type="button" class="leet-btn modal-close-btn" onclick="closeAddPaymentModal()">Cancel</button>
@@ -137,6 +133,7 @@
     </form>
   </div>
 </div>
+
 
 <style>
 .toast-success {
@@ -173,44 +170,6 @@
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
 </style>
 
-
-<script>
-function openAddPaymentModal() {
-    document.getElementById('addPaymentModal').style.display = 'flex';
-}
-function closeAddPaymentModal() {
-    document.getElementById('addPaymentModal').style.display = 'none';
-}
-document.addEventListener('DOMContentLoaded', function() {
-    var paymentMethod = document.getElementById('modal_payment_method');
-    var transactionRow = document.getElementById('modal_transaction_id_row');
-    if (paymentMethod) {
-      paymentMethod.addEventListener('change', function() {
-          if (paymentMethod.value === 'Online') {
-              transactionRow.style.display = 'block';
-          } else {
-              transactionRow.style.display = 'none';
-              document.getElementById('modal_transaction_id').value = '';
-          }
-      });
-    }
-    // Calculate Remaining Amount
-    var amountToBePaidInput = document.getElementById('modal_amount_to_be_paid');
-    var paidAmountInput = document.getElementById('modal_paid_amount');
-    var remainingAmountInput = document.getElementById('modal_remaining_amount');
-    function updateRemaining() {
-        var total = parseFloat(amountToBePaidInput.value) || 0;
-        var paid = parseFloat(paidAmountInput.value) || 0;
-        var rem = total - paid;
-        remainingAmountInput.value = rem >= 0 ? rem : 0;
-    }
-    paidAmountInput.addEventListener('input', updateRemaining);
-    // Set initial value
-    updateRemaining();
-});
-</script>
-
-
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     <script>
@@ -227,7 +186,49 @@ document.addEventListener('DOMContentLoaded', function() {
   {% endif %}
 {% endwith %}
 
+<script>
+function openAddPaymentModal() {
+    document.getElementById('addPaymentModal').style.display = 'flex';
+    setupModalCalc();
+}
+function closeAddPaymentModal() {
+    document.getElementById('addPaymentModal').style.display = 'none';
+}
+
+function setupModalCalc() {
+    var paidAmountInput = document.getElementById('modal_paid_amount');
+    var remainingFeesInput = document.getElementById('modal_remaining_fees');
+    var amountToBePaidInput = document.getElementById('modal_amount_to_be_paid');
+    var amountToBePaid = parseFloat(amountToBePaidInput.value) || 0;
+    function updateRemaining() {
+        var paid = parseFloat(paidAmountInput.value) || 0;
+        var rem = amountToBePaid - paid;
+        remainingFeesInput.value = rem >= 0 ? rem : 0;
+    }
+    if (paidAmountInput && remainingFeesInput) {
+        paidAmountInput.removeEventListener('input', updateRemaining);
+        paidAmountInput.addEventListener('input', updateRemaining);
+        updateRemaining();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var paymentMethod = document.getElementById('modal_payment_method');
+    var transactionRow = document.getElementById('modal_transaction_id_row');
+    if (paymentMethod) {
+        paymentMethod.addEventListener('change', function() {
+            if (paymentMethod.value === 'Online') {
+                transactionRow.style.display = 'block';
+            } else {
+                transactionRow.style.display = 'none';
+                document.getElementById('modal_transaction_id').value = '';
+            }
+        });
+    }
+});
+</script>
+
+
+
 
 {% endblock %}
-
-

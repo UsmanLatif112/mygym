@@ -13,8 +13,11 @@
             <span class="readonly-field">{{ membership_no }}</span>
         </div>
         <div class="form-block">
-            <label>Admission Date:</label>
-            <span class="readonly-field">{{ admission_date }}</span>
+            <label for="admission_date">Admission Date:<span style="font-weight:400; color:#FF0000;">*</span></label>
+            {{ form.admission_date(class_="form-input", id="admission_date") }}
+            {% for error in form.admission_date.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
         </div>
 
         <div class="form-block">
@@ -74,7 +77,7 @@
             {% endfor %}
         </div>
         <div class="form-block">
-            <label for="height">Height (cm):<span style="font-weight:400; color:#FF0000;">*</span></label>
+            <label for="height">Height (cm):<span style="font-weight:400; color:#aaa;">(optional)</span></label>
             {{ form.height(class_="form-input", id="height") }}
             {% for error in form.height.errors %}
                 <span class="form-error">{{ error }}</span>
@@ -130,36 +133,39 @@
             {% endfor %}
         </div>
         <div class="form-block">
-            <label for="package">Package:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.package(class_="form-input", id="package") }}
-            {% for error in form.package.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-        </div>
-        <div class="form-block" id="personal_training_time_row" style="display:none;">
-            <label for="trainer">Trainer<span style="font-weight:400; color:#FF0000;">*</span></label>
-            <select name="trainer" class="form-input" id="trainer">
-                <option value="">Select Trainer</option>
-                {% for t in trainers %}
-                    <option value="{{ t.name }}"
-                        data-timing="{{ t.timing or '' }}"
-                        {% if form.trainer.data == t.name %}selected{% endif %}
-                    >{{ t.name }}</option>
-                {% endfor %}
-            </select>
-            {% for error in form.trainer.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
+    <label for="training_type">Training Type:<span style="font-weight:400; color:#FF0000;">*</span></label>
+    {{ form.training_type(class_="form-input", id="training_type") }}
+    {% for error in form.training_type.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
 
-            <label for="personal_training_time">Preferred Training Time</label>
-            {{ form.personal_training_time(class_="form-input", id="personal_training_time", readonly=True) }}
-            {% for error in form.personal_training_time.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-        </div>
+<div class="form-block">
+    <label for="package">Package:<span style="font-weight:400; color:#FF0000;">*</span></label>
+    <select name="package" class="form-input" id="package">
+        {% for val, label in individual_packages %}
+            <option value="{{ val }}" {% if form.package.data == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    {% for error in form.package.errors %}
+        <span class="form-error">{{ error }}</span>
+    {% endfor %}
+</div>
 
-
-
+<div class="form-block" id="personal_training_time_row" style="display:none;">
+    <label for="trainer">Trainer<span style="font-weight:400; color:#FF0000;">*</span></label>
+    <select name="trainer" class="form-input" id="trainer">
+        <option value="">Select Trainer</option>
+        {% for t in trainers %}
+            <option value="{{ t.name }}" data-timing="{{ t.timing or '' }}"
+                {% if form.trainer.data == t.name %}selected{% endif %}>
+                {{ t.name }}
+            </option>
+        {% endfor %}
+    </select>
+    <label for="personal_training_time">Preferred Training Time</label>
+    {{ form.personal_training_time(class_="form-input", id="personal_training_time", readonly=True) }}
+</div>
 
         <div class="form-block">
             <label for="bmi_test">BMI Test:<span style="font-weight:400; color:#FF0000;">*</span></label>
@@ -271,25 +277,107 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <script>
-  $(function() {
-    $('.select2').select2({ width: '100%' });
+document.addEventListener('DOMContentLoaded', function() {
+    var trainingTypeSelect = document.getElementById('training_type');
+    var packageSelect = document.getElementById('package');
+    var trainerRow = document.getElementById('personal_training_time_row');
 
-    $('#package').on('change', function() {
-      if ($(this).val().startsWith('Personal')) {
-        $('#personal_training_time_row').show();
-      } else {
-        $('#personal_training_time_row').hide();
-      }
-    }).trigger('change');
+    // Get package lists from Flask context
+    var individualPackages = {{ individual_packages|tojson }};
+    var personalPackages = {{ personal_packages|tojson }};
 
-    $('select[name="bmi_test"]').on('change', function() {
-      if ($(this).val() === 'Yes') {
-        $('#bmi_value_row').show();
-      } else {
-        $('#bmi_value_row').hide();
-      }
-    }).trigger('change');
+    function updatePackageOptions() {
+        var type = trainingTypeSelect.value;
+        var options = (type === 'Personal') ? personalPackages : individualPackages;
+        packageSelect.innerHTML = '';
+        options.forEach(function(pkg) {
+            var opt = document.createElement('option');
+            opt.value = pkg[0];
+            opt.textContent = pkg[1];
+            packageSelect.appendChild(opt);
+        });
+        // Set first option as selected
+        if (options.length > 0) packageSelect.value = options[0][0];
+    }
+    function toggleTrainerField() {
+        if (trainingTypeSelect.value === 'Personal') {
+            trainerRow.style.display = 'block';
+        } else {
+            trainerRow.style.display = 'none';
+        }
+    }
 
+    trainingTypeSelect.addEventListener('change', function() {
+        updatePackageOptions();
+        toggleTrainerField();
+    });
+
+    // Set initial state
+    updatePackageOptions();
+    toggleTrainerField();
+
+    // Trainer timing autofill
+    var trainerSelect = document.getElementById('trainer');
+    var timeInput = document.getElementById('personal_training_time');
+    if (trainerSelect && timeInput) {
+        function syncTime() {
+            var selectedOption = trainerSelect.options[trainerSelect.selectedIndex];
+            var timing = selectedOption ? selectedOption.getAttribute('data-timing') : '';
+            timeInput.value = timing || '';
+        }
+        trainerSelect.addEventListener('change', syncTime);
+        syncTime();
+    }
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Show/hide trainer row based on training type
+    var trainingTypeSelect = document.getElementById('training_type');
+    var trainerRow = document.getElementById('personal_training_time_row');
+
+    function toggleTrainerField() {
+        if (trainingTypeSelect.value === 'Personal') {
+            trainerRow.style.display = 'block';
+        } else {
+            trainerRow.style.display = 'none';
+        }
+    }
+
+    trainingTypeSelect.addEventListener('change', toggleTrainerField);
+    toggleTrainerField(); // Initialize on page load
+
+    // Preferred Training Time autofill
+    var trainerSelect = document.getElementById('trainer');
+    var timeInput = document.getElementById('personal_training_time');
+    function syncTime() {
+        var selectedOption = trainerSelect.options[trainerSelect.selectedIndex];
+        var timing = selectedOption ? selectedOption.getAttribute('data-timing') : '';
+        timeInput.value = timing || '';
+    }
+    trainerSelect.addEventListener('change', syncTime);
+    syncTime();
+
+    // BMI Test toggle
+    var bmiTestSelect = document.getElementById('bmi_test');
+    var bmiValueRow = document.getElementById('bmi_value_row');
+    function toggleBMIValueRow() {
+        if (bmiTestSelect.value === 'Yes') {
+            bmiValueRow.style.display = 'block';
+        } else {
+            bmiValueRow.style.display = 'none';
+        }
+    }
+    bmiTestSelect.addEventListener('change', toggleBMIValueRow);
+    toggleBMIValueRow();
+});
+</script>
+
+
+<script>
+    $(document).ready(function() {
     $('select[name="illnesses"]').on('change', function() {
       if ($(this).val() && $(this).val().includes('Other')) {
         $('#illness_other_row').show();
@@ -299,6 +387,78 @@ document.addEventListener('DOMContentLoaded', function() {
     }).trigger('change');
   });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var trainingTypeSelect = document.getElementById('training_type');
+    var packageSelect = document.getElementById('package');
+    var trainerRow = document.getElementById('personal_training_time_row');
+
+    // Prepare package options for both types from Flask context (rendered into JS)
+    var individualPackages = {{ individual_packages|tojson }};
+    var personalPackages = {{ personal_packages|tojson }};
+
+    function updatePackageOptions() {
+        var type = trainingTypeSelect.value;
+        var options = (type === 'Personal') ? personalPackages : individualPackages;
+        packageSelect.innerHTML = '';
+        options.forEach(function(pkg) {
+            var opt = document.createElement('option');
+            opt.value = pkg[0];  // id
+            opt.textContent = pkg[1];  // name
+            packageSelect.appendChild(opt);
+        });
+        // Optionally, reset selection to first option
+        if (options.length > 0) packageSelect.value = options[0][0];
+    }
+
+    function toggleTrainerField() {
+        if (trainingTypeSelect.value === 'Personal') {
+            trainerRow.style.display = 'block';
+        } else {
+            trainerRow.style.display = 'none';
+        }
+    }
+
+    trainingTypeSelect.addEventListener('change', function() {
+        updatePackageOptions();
+        toggleTrainerField();
+    });
+
+    // Set initial state
+    updatePackageOptions();
+    toggleTrainerField();
+
+    // Trainer timing autofill
+    var trainerSelect = document.getElementById('trainer');
+    var timeInput = document.getElementById('personal_training_time');
+    if (trainerSelect && timeInput) {
+        function syncTime() {
+            var selectedOption = trainerSelect.options[trainerSelect.selectedIndex];
+            var timing = selectedOption ? selectedOption.getAttribute('data-timing') : '';
+            timeInput.value = timing || '';
+        }
+        trainerSelect.addEventListener('change', syncTime);
+        syncTime();
+    }
+
+    // BMI Test logic (unchanged)
+    var bmiTestSelect = document.getElementById('bmi_test');
+    var bmiValueRow = document.getElementById('bmi_value_row');
+    if (bmiTestSelect && bmiValueRow) {
+        function toggleBMIValueRow() {
+            if (bmiTestSelect.value === 'Yes') {
+                bmiValueRow.style.display = 'block';
+            } else {
+                bmiValueRow.style.display = 'none';
+            }
+        }
+        bmiTestSelect.addEventListener('change', toggleBMIValueRow);
+        toggleBMIValueRow();
+    }
+});
+</script>
+
 
 <style>
 .toast-error {
@@ -340,21 +500,5 @@ document.addEventListener('DOMContentLoaded', function() {
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-  $(function() {
-    $('.select2').select2({ width: '100%' });
-  });
 
-  $(function() {
-    function toggleBMIValue() {
-        if ($('#bmi_test').val() === 'Yes') {
-            $('#bmi_value_row').show();
-        } else {
-            $('#bmi_value_row').hide();
-        }
-    }
-    $('#bmi_test').on('change', toggleBMIValue);
-    toggleBMIValue(); // set initial state
-  });
-</script>
 

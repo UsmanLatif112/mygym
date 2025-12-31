@@ -1,38 +1,38 @@
-# from app import app
-# from models import db, User
+from app import app
+from models import db, User
 
-
-# with app.app_context():
-#     db.create_all()  # Ensure tables exist
-
-#     # Change these values as you wish
-#     username = 'admin'
-#     password = 'admin123'
-#     role_id = 1
-
-#     if not User.query.filter_by(username=username).first():
-#         user = User(username=username, role_id=role_id)
-#         user.set_password(password)  # Or: user.password = generate_password_hash(password)
-#         db.session.add(user)
-#         db.session.commit()
-#         print(f'User created: {username} / {password} with role_id={role_id}')
-#     else:
-#         print('User already exists.')
-
-
-from app import app, db
-
-# Make sure this matches your new Billing model!
-from models import Customer
 
 with app.app_context():
-    # Drop the existing 'billing' table if it exists
-    Customer.__table__.drop(db.engine, checkfirst=True)
-    print("Dropped existing 'billing' table (if it existed).")
+    db.create_all()  # Ensure tables exist
 
-    # Recreate the new 'billing' table
-    db.create_all()
-    print("Created new 'billing' table with updated schema.")
+    # Change these values as you wish
+    username = 'admin 2'
+    password = 'admin123'
+    role_id = 2
+
+    if not User.query.filter_by(username=username).first():
+        user = User(username=username, role_id=role_id)
+        user.set_password(password)  # Or: user.password = generate_password_hash(password)
+        db.session.add(user)
+        db.session.commit()
+        print(f'User created: {username} / {password} with role_id={role_id}')
+    else:
+        print('User already exists.')
+
+
+# from app import app, db
+
+# # Make sure this matches your new Billing model!
+# from models import Packages
+
+# with app.app_context():
+#     # Drop the existing 'billing' table if it exists
+#     Packages.__table__.drop(db.engine, checkfirst=True)
+#     print("Dropped existing 'billing' table (if it existed).")
+
+#     # Recreate the new 'billing' table
+#     db.create_all()
+#     print("Created new 'billing' table with updated schema.")
 
 # from app import app, db
 # from models import Billing

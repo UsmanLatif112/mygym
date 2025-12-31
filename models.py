@@ -23,6 +23,7 @@ class Customer(db.Model):
     membership_no = db.Column(db.String(20), unique=True)
     admission_date = db.Column(db.Date)
     type = db.Column(db.String(32))
+    package_id = db.Column(db.Integer, db.ForeignKey('packages.id')) 
     status = db.Column(db.String(20), default="Not Paid")
     billing_date = db.Column(db.Date)
     name = db.Column(db.String(120), nullable=False)
@@ -112,10 +113,11 @@ class Employee(db.Model):
 
 class Packages(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    package_name = db.Column(db.String(100))
-    package_price = db.Column(db.String(100))
-    packgae_duration = db.Column(db.String(100))
-    registeration_fees = db.Column(db.String(100))
+    package_name = db.Column(db.String(100), nullable=False)
+    package_type = db.Column(db.String(50), nullable=False)  # e.g., 'Individual' or 'Personal'
+    package_duration = db.Column(db.String(50), nullable=False)  # e.g., '1 Month', '6 Months'
+    package_price = db.Column(db.Float, nullable=False)
+    registration_fees = db.Column(db.Float, nullable=False)
     
 class BillingHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
