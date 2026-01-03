@@ -54,11 +54,12 @@
             <input type="hidden" name="package_id" id="package-id">
             <div style="margin-bottom:13px;">
                 <label style="color:#ffb347; font-weight:600;">Name</label>
-                <input type="text" name="package_name" id="package-name" class="form-input" style="width:100%; margin-top:8px;" required>
+                <input type="text" name="package_name" placeholder="Enter package name" id="package-name" class="form-input" style="width:100%; margin-top:8px;" required>
             </div>
             <div style="margin-bottom:13px;">
                 <label style="color:#ffb347; font-weight:600;">Type</label>
                 <select name="package_type" id="package-type" class="form-input" style="width:100%;" required>
+                    <option value="Select Option">Select Option</option>
                     <option value="Individual">Individual</option>
                     <option value="Personal Training">Personal Training</option>
                 </select>
@@ -66,6 +67,7 @@
             <div style="margin-bottom:13px;">
                 <label style="color:#ffb347; font-weight:600;">Duration</label>
                 <select name="package_duration" id="package-duration" class="form-input" style="width:100%;" required>
+                    <option value="Select Option">Select Option</option>
                     <option value="1 Month">1 Month</option>
                     <option value="3 Months">3 Months</option>
                     <option value="6 Months">6 Months</option>
@@ -74,12 +76,12 @@
             </div>
             <div style="margin-bottom:13px;">
                 <label style="color:#ffb347; font-weight:600;">Price</label>
-                <input type="number" min="0" step="any" name="package_price" id="package-price" class="form-input" style="width:100%;" required>
+                <input type="number" min="0" step="any" name="package_price" placeholder="Enter price" id="package-price" class="form-input" style="width:100%;" required>
                 <span id="price-error" style="color:red; display:none;">Please enter a valid number.</span>
             </div>
             <div style="margin-bottom:20px;">
                 <label style="color:#ffb347; font-weight:600;">Registration Fees</label>
-                <input type="number" min="0" step="any" name="registration_fees" id="registration-fees" class="form-input" style="width:100%;" required>
+                <input type="number" min="0" step="any" name="registration_fees" placeholder="Enter registration fees" id="registration-fees" class="form-input" style="width:100%;" required>
                 <span id="fees-error" style="color:red; display:none;">Please enter a valid number.</span>
             </div>
             <div id="modal-message" style="color:#ffb347; margin-bottom:8px;"></div>
@@ -97,8 +99,8 @@ function openAddModal() {
     document.getElementById('form-mode').value = 'add';
     document.getElementById('package-id').value = '';
     document.getElementById('package-name').value = '';
-    document.getElementById('package-type').value = 'Individual';
-    document.getElementById('package-duration').value = '1 Month';
+    document.getElementById('package-type').value = 'Select Option';
+    document.getElementById('package-duration').value = 'Select Option';
     document.getElementById('package-price').value = '';
     document.getElementById('registration-fees').value = '';
     document.getElementById('modal-submit-btn').innerText = 'Add';

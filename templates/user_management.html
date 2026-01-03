@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">User Management</h1>
+
+<div class="customers-header">
+    <div></div>
+    <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="openAddUserModal()">
+        <i class="fa fa-user-plus"></i> Add User
+    </button>
+</div>
+
+<!-- Users Table -->
+<table class="customers-table">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Role</th>
+      <th style="text-align:center;">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.username }}</td>
+      <td>{% if u.role_id == '1' %}Admin{% else %}User{% endif %}</td>
+      <td>
+        <div style="display:flex; justify-content:center; gap:10px;">
+          <!-- Edit Button -->
+          <button class="leet-btn" style="width:50px; height:34px; padding:6px 2px;" 
+                  title="Edit User"
+                  onclick="openEditUserModal({{ u.id }}, '{{ u.username }}', '{{ u.role_id }}')">
+            <i class="fa fa-edit"></i>
+          </button>
+
+          <!-- Delete Button (hidden for admin user) -->
+          {% if u.username != 'admin' %}
+          <form style="display:inline;" method="POST" action="{{ url_for('delete_user', user_id=u.id) }}">
+            <button class="leet-btn delete-btn" style="width:50px;height:34px; padding:6px 2px;" title="Delete User" type="submit">
+              <i class="fa fa-trash"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="3" style="text-align:center;">No users found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:500px;">
+    <h2>Add User</h2>
+    <form id="addUserForm" method="POST" action="{{ url_for('add_user') }}">
+      <div class="form-block" style="margin-bottom:10px;">
+        <label>Username:</label>
+        <input type="text" name="username" id="add_username" class="form-input" required>
+        <span id="username-error" class="form-error" style="color:#d90429;"></span>
+      </div>
+      <div class="form-block" style="margin-bottom:10px;">
+        <label>Role:</label>
+        <select name="role_id" class="form-input" required>
+          <option value="">Select Role</option>
+          <option value="1">Admin</option>
+          <option value="2">User</option>
+        </select>
+      </div>
+
+      <div class="form-block" style="margin-bottom:15px; position:relative;">
+        <label>Password:</label>
+        <input type="password" name="password" id="add_password" class="form-input" required>
+        <i id="add_password_toggle" class="fa fa-eye toggle-password" 
+           style="position:absolute;padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
+           onclick="togglePassword('add_password')"></i>
+      </div>
+
+      <div class="form-block" style="margin-bottom:15px; position:relative;">
+        <label>Confirm Password:</label>
+        <input type="password" name="confirm_password" id="add_confirm_password" class="form-input" required>
+        <i id="add_confirm_toggle" class="fa fa-eye toggle-password" 
+           style="position:absolute; padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
+           onclick="togglePassword('add_confirm_password')"></i>
+        <span id="password-error" class="form-error" style="color:#d90429;"></span>
+      </div>
+
+      <div class="form-block" style="display:flex; gap:10px;">
+        <button type="submit" class="leet-btn">Save</button>
+        <button type="button" class="leet-btn" onclick="closeAddUserModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:500px;">
+    <h2>Edit User</h2>
+    <form id="editUserForm" method="POST">
+      <input type="hidden" name="user_id" id="edit_user_id">
+      <div class="form-block" style="margin-bottom:10px;">
+        <label>Username:</label>
+        <input type="text" name="username" id="edit_username" class="form-input" required>
+      </div>
+      <div class="form-block" style="margin-bottom:10px;">
+        <label>Role:</label>
+        <select name="role_id" id="edit_role" class="form-input" required>
+          <option value="1">Admin</option>
+          <option value="2">User</option>
+        </select>
+      </div>
+
+      <div class="form-block" style="margin-bottom:15px; position:relative;">
+        <label>Password (leave blank to keep current):</label>
+        <input type="password" name="password" id="edit_password" class="form-input">
+        <i id="edit_password_toggle" class="fa fa-eye toggle-password" 
+           style="position:absolute; padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
+           onclick="togglePassword('edit_password')"></i>
+      </div>
+
+      <div class="form-block" style="margin-bottom:15px; position:relative;">
+        <label>Confirm Password:</label>
+        <input type="password" name="confirm_password" id="edit_confirm_password" class="form-input">
+        <i id="edit_confirm_toggle" class="fa fa-eye toggle-password" 
+           style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
+           onclick="togglePassword('edit_confirm_password')"></i>
+        <span id="edit-password-error" class="form-error" style="color:#d90429;"></span>
+      </div>
+
+      <div class="form-block" style="display:flex; gap:10px;">
+        <button type="submit" class="leet-btn">Save Changes</button>
+        <button type="button" class="leet-btn" onclick="closeEditUserModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Styles -->
+<style>
+.toast-success, .toast-error {
+    position: fixed;
+    top: 36px;
+    right: 36px;
+    min-width: 260px;
+    padding: 16px 30px;
+    border-radius: 8px;
+    font-size: 1.08em;
+    box-shadow: 0 4px 24px #0002;
+    z-index: 9999;
+    opacity: 0.97;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+.toast-success { background: #36b37e; color: #fff; animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards; }
+.toast-error { background: #d90429; color: #fff; animation: toast-in 0.3s, toast-out 0.4s 2.4s forwards; }
+@keyframes toast-in { from {opacity:0; transform:translateY(-20px);} to {opacity:0.97; transform:translateY(0);} }
+@keyframes toast-out { from {opacity:0.97;} to {opacity:0;} }
+</style>
+
+<!-- Toast Messages -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Get Flask flashed messages
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                // Create toast div
+                var toast = document.createElement('div');
+                toast.className = "{{ 'toast-success' if category=='success' else 'toast-error' }}";
+                toast.innerText = "{{ message|escape }}";
+
+                // Append to body
+                document.body.appendChild(toast);
+
+                // Auto-remove after 2.8s
+                setTimeout(function(){ toast.remove(); }, 2800);
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+});
+</script>
+
+
+<!-- Scripts -->
+<script>
+function openAddUserModal() { document.getElementById('addUserModal').style.display = 'flex'; }
+function closeAddUserModal() { document.getElementById('addUserModal').style.display = 'none'; }
+
+function openEditUserModal(id, username, role_id) {
+    document.getElementById('edit_user_id').value = id;
+    document.getElementById('edit_username').value = username;
+    document.getElementById('edit_role').value = role_id;
+    document.getElementById('editUserForm').action = '/edit_user/' + id;
+    document.getElementById('edit_password').value = '';
+    document.getElementById('edit_confirm_password').value = '';
+    document.getElementById('edit-password-error').textContent = '';
+    document.getElementById('editUserModal').style.display = 'flex';
+}
+function closeEditUserModal() { document.getElementById('editUserModal').style.display = 'none'; }
+
+// Toggle Password Visibility
+function togglePassword(id){
+    const input = document.getElementById(id);
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Fields for toggling icons
+    const passwordFields = [
+        {input: 'add_password', toggle: 'add_password_toggle'},
+        {input: 'add_confirm_password', toggle: 'add_confirm_toggle'},
+        {input: 'edit_password', toggle: 'edit_password_toggle'},
+        {input: 'edit_confirm_password', toggle: 'edit_confirm_toggle'}
+    ];
+
+    passwordFields.forEach(f => {
+        const inputEl = document.getElementById(f.input);
+        const toggleEl = document.getElementById(f.toggle);
+        inputEl.addEventListener('input', function() {
+            toggleEl.style.display = inputEl.value.length > 0 ? 'block' : 'none';
+        });
+    });
+
+    // Live username check for Add Modal
+    const usernameInput = document.getElementById('add_username');
+    const usernameError = document.getElementById('username-error');
+    usernameInput.addEventListener('input', function() {
+        const val = usernameInput.value.trim();
+        if (!val) { usernameError.textContent = ''; return; }
+        fetch('{{ url_for("check_username") }}', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:'username=' + encodeURIComponent(val)
+        })
+        .then(res => res.json())
+        .then(data => {
+            usernameError.textContent = data.exists ? 'Username already exists.' : '';
+        });
+    });
+
+    // Password match check for Add Modal
+    const addForm = document.getElementById('addUserForm');
+    addForm.addEventListener('submit', function(e){
+        const pwd = addForm.password.value;
+        const cpwd = addForm.confirm_password.value;
+        const pwdErr = document.getElementById('password-error');
+        if(cpwd && pwd !== cpwd){
+            e.preventDefault();
+            pwdErr.textContent = 'Passwords do not match.';
+        } else {
+            pwdErr.textContent = '';
+        }
+    });
+
+    // Password match check for Edit Modal
+    const editForm = document.getElementById('editUserForm');
+    editForm.addEventListener('submit', function(e){
+        const pwd = editForm.password.value;
+        const cpwd = editForm.confirm_password.value;
+        const pwdErr = document.getElementById('edit-password-error');
+        if((pwd || cpwd) && pwd !== cpwd){ // only if user is changing password
+            e.preventDefault();
+            pwdErr.textContent = 'Passwords do not match.';
+        } else {
+            pwdErr.textContent = '';
+        }
+    });
+});
+</script>
+
+
+{% endblock %}

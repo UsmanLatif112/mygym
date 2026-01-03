@@ -6,7 +6,6 @@
     <a href="{{ url_for('employees') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
     <div class="customer-header">
       <div>
-        
         {% if employee.name|length > 12 %}
           <h2 class="customer-name" title="{{ employee.name }}">{{ employee.name[:12] }}&hellip;</h2>
         {% else %}
@@ -27,9 +26,9 @@
         <button class="sleet-btn" type="button" onclick="openEditEmployeeModal()">
             <i class="fa fa-edit"></i> Edit
         </button>
-        <a href="{{ url_for('delete_employee', employee_id=employee.id) }}" class="sleet-btn delete-btn">
-            <i class="fa fa-trash"></i> Delete
-        </a>
+        <a href="#" class="sleet-btn delete-btn" onclick="openDeleteConfirmationModal('{{ url_for('delete_employee', employee_id=employee.id) }}', true)">
+    <i class="fa fa-trash"></i> Delete
+</a>
       </div>
     </div>
     <hr class="customer-divider">
@@ -38,7 +37,7 @@
         <thead>
             <tr>
                 <th>Type</th>
-                <th>Phone </th>
+                <th>Phone</th>
                 <th>Salary</th>
                 <th>Timing</th>
                 <th>CNIC</th>
@@ -82,6 +81,7 @@
                 <th>Type</th>
                 <th>Method</th>
                 <th>Tr. ID</th>
+                <th>Action</th> 
             </tr>
         </thead>
         <tbody>
@@ -97,6 +97,13 @@
                     {% else %}
                         <span style="color:#aaa;">None</span>
                     {% endif %}
+                </td>
+                <td>
+                    <form action="{{ url_for('delete_salary_entry', entry_id=s.id) }}" method="post" style="display:inline;">
+                        <button type="button" style="padding-top: 9px;padding-bottom: 5px;width: 50px;height: 33px;" class="leet-btn delete-btn" onclick="openDeleteConfirmationModal('{{ url_for('delete_salary_entry', entry_id=s.id) }}')">
+    <i class="fa fa-trash"></i>
+</button>
+                    </form>
                 </td>
             </tr>
             {% else %}
@@ -116,58 +123,67 @@
   <div class="modal-content">
     <h2 style="margin-top: 1px;">Edit Employee</h2>
     <form id="editEmployeeForm" method="POST" action="{{ url_for('edit_employee_by_cnic', cnic=employee.cnic) }}">
-
       {{ form.hidden_tag() }}
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="name">Employee Name:</label>
         {{ form.name(class_="form-input", id="edit-name") }}
         {% for error in form.name.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="cnic">Employee CNIC:</label>
         {{ form.cnic(class_="form-input", id="edit-cnic", readonly=True) }}
         {% for error in form.cnic.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="employment_type">Employment Type:</label>
         {{ form.employment_type(class_="form-input", id="edit-employment_type") }}
         {% for error in form.employment_type.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="phone_number">Phone Number:</label>
-        {{ form.phone_number(class_="form-input", id="edit-phone_number") }}
+        {{ form.phone_number(class_="form-input", id="edit-phone_number", placeholder="03XXXXXXXXX") }}
         {% for error in form.phone_number.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="salary">Salary:</label>
         {{ form.salary(class_="form-input", id="edit-salary") }}
         {% for error in form.salary.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="timing">Timing:</label>
-        {{ form.timing(class_="form-input", id="edit-timing") }}
-        {% for error in form.timing.errors %}
-        <span class="form-error">{{ error }}</span>
-        {% endfor %}
+        <div style="display: flex; gap: 4px;">
+            <input type="time" id="edit_start_time" class="form-input" required>
+            <select id="edit_start_period" class="form-input" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+            </select>
+            <span style="align-self: center;">to</span>
+            <input type="time" id="edit_end_time" class="form-input" required>
+            <select id="edit_end_period" class="form-input" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+            </select>
+        </div>
+        <input type="hidden" name="timing" id="edit-timing">
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="shift">Shift:</label>
         {{ form.shift(class_="form-input", id="edit-shift") }}
         {% for error in form.shift.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
       </div>
-      <div class="form-block" style="margin-bottom:5px;font-size:15px;">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label for="status">Status:</label>
         {{ form.status(class_="form-input", id="edit-status") }}
         {% for error in form.status.errors %}
@@ -181,6 +197,54 @@
     </form>
   </div>
 </div>
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmationModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width: 400px; padding: 20px;">
+      <h2 style="margin: 0 0 20px;">Confirm Deletion</h2>
+      <p style="color: #fff;">Are you sure you want to delete this entry?</p>
+      <div class="modal-actions" style="display: flex; justify-content: space-between;">
+          <button type="button" class="leet-btn" style="background:#ff7300; color:#fff;" onclick="confirmDelete()">Yes</button>
+          <button type="button" class="leet-btn modal-close-btn" style="background:#181818; color:#fff;" onclick="closeDeleteConfirmationModal()">No</button>
+      </div>
+  </div>
+</div>
+
+<script>
+let deleteUrl = '';
+let redirectToEmployees = false;
+
+function openDeleteConfirmationModal(url, redirect = false) {
+    deleteUrl = url;
+    redirectToEmployees = redirect;
+    document.getElementById('deleteConfirmationModal').style.display = 'flex';
+}
+
+function closeDeleteConfirmationModal() {
+    document.getElementById('deleteConfirmationModal').style.display = 'none';
+}
+
+function confirmDelete() {
+    fetch(deleteUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+    .then(response => {
+        if (response.ok) {
+            if (redirectToEmployees) {
+                location.href = "{{ url_for('employees') }}"; // Redirect to employees page
+            } else {
+                location.reload(); // Refresh the current page
+            }
+        } else {
+            alert('Failed to delete entry.');
+        }
+    });
+}
+</script>
+
+
+
+
 
 <script>
 function openEditEmployeeModal() {
@@ -190,17 +254,68 @@ function openEditEmployeeModal() {
     document.getElementById('edit-employment_type').value = {{ employee.employment_type|tojson }};
     document.getElementById('edit-phone_number').value = {{ employee.phone_number|tojson }};
     document.getElementById('edit-salary').value = {{ employee.salary|tojson }};
-    document.getElementById('edit-timing').value = {{ employee.timing|tojson }};
     document.getElementById('edit-shift').value = {{ employee.shift|tojson }};
     document.getElementById('edit-status').value = {{ employee.status|tojson }};
+    
+    const timing = {{ employee.timing|tojson }};
+    populateTiming(timing);
 
     modal.style.display = 'flex';
 }
+
 function closeEditEmployeeModal() {
     document.getElementById('editEmployeeModal').style.display = 'none';
 }
-</script>
 
+function populateTiming(existingTiming) {
+    const regex = /(\d{1,2}:\d{2}) (AM|PM) to (\d{1,2}:\d{2}) (AM|PM)/;
+    const parts = existingTiming.match(regex);
+    if (parts) {
+        document.getElementById('edit_start_time').value = convertTo24Hour(parts[1], parts[2]);
+        document.getElementById('edit_start_period').value = parts[2];
+        document.getElementById('edit_end_time').value = convertTo24Hour(parts[3], parts[4]);
+        document.getElementById('edit_end_period').value = parts[4];
+    }
+}
+
+function convertTo24Hour(time, period) {
+    let [hour, minute] = time.split(':');
+    hour = parseInt(hour);
+    if (period === 'PM' && hour !== 12) {
+        hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+        hour = 0;
+    }
+    return `${hour.toString().padStart(2, '0')}:${minute}`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const startTime = document.getElementById('edit_start_time');
+    const startPeriod = document.getElementById('edit_start_period');
+    const endTime = document.getElementById('edit_end_time');
+    const endPeriod = document.getElementById('edit_end_period');
+    const timingInput = document.getElementById('edit-timing');
+
+    function updateTiming() {
+        const start = startTime.value ? `${convertTo12Hour(startTime.value)} ${startPeriod.value}` : '';
+        const end = endTime.value ? `${convertTo12Hour(endTime.value)} ${endPeriod.value}` : '';
+        timingInput.value = start && end ? `${start} to ${end}` : '';
+        console.log(timingInput.value); // Debugging: Check the value before submission
+    }
+
+    function convertTo12Hour(time) {
+        let [hour, minute] = time.split(':');
+        const period = hour >= 12 ? 'PM' : 'AM';
+        hour = hour % 12 || 12;
+        return `${hour}:${minute}`;
+    }
+
+    startTime.addEventListener('change', updateTiming);
+    startPeriod.addEventListener('change', updateTiming);
+    endTime.addEventListener('change', updateTiming);
+    endPeriod.addEventListener('change', updateTiming);
+});
+</script>
 
 <style>
 .toast-error {
@@ -222,49 +337,16 @@ function closeEditEmployeeModal() {
 }
 @keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+
+input[type="time"] {
+    color: #fff;
+    background-color: #181818;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 8px 10px;
+    appearance: none;
+}
 </style>
-{% if form.cnic.errors %}
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      var toast = document.createElement('div');
-      toast.className = 'toast-error';
-      toast.innerText = "{{ form.cnic.errors[0]|escape }}";
-      document.body.appendChild(toast);
-      setTimeout(function() { toast.remove(); }, 2800);
-    });
-  </script>
-{% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const cnicInput = document.getElementById('cnic');
-    const cnicError = document.createElement('span');
-    cnicError.className = 'form-error';
-    cnicInput.parentNode.appendChild(cnicError);
-
-    cnicInput.addEventListener('input', function() {
-        const cnic = cnicInput.value.trim();
-        if (!cnic) {
-            cnicError.textContent = '';
-            return;
-        }
-        // Send AJAX POST to check CNIC
-        fetch('{{ url_for("check_employee_cnic") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'cnic=' + encodeURIComponent(cnic)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.exists) {
-                cnicError.textContent = 'This employee CNIC already exists.';
-            } else {
-                cnicError.textContent = '';
-            }
-        });
-    });
-});
-</script>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -282,27 +364,26 @@ document.addEventListener('DOMContentLoaded', function() {
   {% endif %}
 {% endwith %}
 
-
 <div id="paySalaryModal" class="modal-overlay" style="display:none;">
   <div class="modal-content" style="max-width:400px;">
     <h2>Pay Salary</h2>
     <form method="POST" action="{{ url_for('pay_salary', employee_id=employee.id) }}">
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label>Employee Name:</label>
         <input type="text" value="{{ employee.name }}" readonly class="form-input">
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label>Salary Amount:</label>
         <input type="number" min="0" step="1" name="salary_amount" class="form-input" value="{{ employee.salary or '' }}" required>
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label>Payment Type:</label>
         <select name="payment_type" class="form-input" required>
           <option value="Salary">Salary</option>
           <option value="Advance">Advance</option>
         </select>
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom: 10px;">
         <label>Payment Method:</label>
         <select name="payment_method" class="form-input" id="salary_payment_method" required>
           <option value="">Select Method</option>
@@ -310,9 +391,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <option value="Online">Online</option>
         </select>
       </div>
-      <div class="form-block" id="salary_transaction_id_row" style="display:none;">
+      <div class="form-block" id="salary_transaction_id_row" style="display:none; margin-bottom: 10px;">
         <label>Transaction ID:</label>
-        <input type="text" name="transaction_id" id="salary_transaction_id" class="form-input">
+        <input type="text" name="transaction_id" id="salary_transaction_id" class="form-input" placeholder="Enter Transaction ID">
       </div>
       <div class="form-block" style="display: flex; gap: 10px;">
         <button type="submit" class="leet-btn">Save</button>
@@ -321,7 +402,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
   </div>
 </div>
-
 
 <script>
 function openPaySalaryModal() {
@@ -345,6 +425,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
 
 {% endblock %}

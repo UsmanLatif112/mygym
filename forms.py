@@ -1,9 +1,4 @@
-from flask_wtf import FlaskForm
-from wtforms import StringField, StringField, PasswordField, SubmitField, FloatField, SelectField, DateField, BooleanField, SelectMultipleField, TextAreaField, RadioField
-from wtforms.validators import DataRequired, Email, Length, Optional, Regexp,  ValidationError
-import re
-from models import Customer,Employee
-
+from helper import *
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -41,7 +36,7 @@ class CustomerForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     gender = SelectField('Gender', choices=[('Male','Male'),('Female','Female'),('Other','Other')], validators=[DataRequired()])
     marital_status = SelectField('Marital Status', choices=[('Married','Married'),('Single','Single'),('Other','Other')], validators=[DataRequired()])
-    blood_group = SelectField('Blood Group', choices=[('A+','A+'),('A-','A-'),('B+','B+'),('B-','B-'),('O+','O+'),('O-','O-'),('AB+','AB+'),('AB-','AB-')], validators=[Optional()])
+    blood_group = SelectField('Blood Group', choices=[('Select Blood Group','Select Blood Group'),('A+','A+'),('A-','A-'),('B+','B+'),('B-','B-'),('O+','O+'),('O-','O-'),('AB+','AB+'),('AB-','AB-')], validators=[Optional()])
     dob = DateField('Date of Birth', validators=[DataRequired()], format='%Y-%m-%d')
     height = FloatField('Height (cm)', validators=[Optional()])
     weight = FloatField('Weight (kg)', validators=[DataRequired()])
@@ -49,8 +44,8 @@ class CustomerForm(FlaskForm):
     profession = StringField('Profession', validators=[Optional()])
     nationality = StringField('Nationality', validators=[Optional()])
     address = StringField('Address', validators=[DataRequired()])
-    phone = StringField('Phone Number', validators=[DataRequired(), Length(min=11, max=14)])
-    emergency_contact = StringField('Emergency Contact No', validators=[DataRequired(), Length(min=11, max=14)])
+    phone = StringField('Phone', validators=[DataRequired(), validate_phone])
+    emergency_contact = StringField('Emergency Contact No', validators=[DataRequired(), validate_phone])
     # This is correct (choices get set in your route)
     package = SelectField('Package', choices=[], validators=[DataRequired()])
 
@@ -67,8 +62,8 @@ class CustomerForm(FlaskForm):
 
 class EmployeeForm(FlaskForm):
     name = StringField('Employee Name', validators=[DataRequired()])
-    cnic = StringField('CNIC', validators=[DataRequired()])
-
+    cnic = StringField('CNIC', validators=[DataRequired(), Regexp(r'^\d{5}-\d{7}-\d{1}$', message="Invalid CNIC format")])
+    phone_number = StringField('Phone', validators=[DataRequired(), validate_phone])
     def validate_cnic(self, field):
         cnic = field.data.strip()
         # CNIC format check (same as yours)
@@ -90,7 +85,6 @@ class EmployeeForm(FlaskForm):
 
     employment_type = SelectField('Employment Type', choices=[('Owner', 'Owner'), ('Trainer', 'Trainer'), ('Office Boy', 'Office Boy')], validators=[DataRequired()])
     timing = StringField('Timing')
-    phone_number = StringField('Phone Number', validators=[DataRequired(), Length(min=11, max=14)])
     shift = SelectField('Shift', choices=[('Morning', 'Morning'), ('Evening', 'Evening'), ('Night', 'Night')], validators=[DataRequired()])
     salary = FloatField('Salary')
     status = SelectField('Status', choices=[('Active', 'Active'), ('Inactive', 'Inactive')], validators=[DataRequired()])

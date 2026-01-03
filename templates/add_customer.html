@@ -22,28 +22,35 @@
 
         <div class="form-block">
             <label for="name">Full Name:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.name(class_="form-input", id="name") }}
+
+            {{ form.name(class_="form-input", id="name", placeholder="Please enter your name here..") }}
             {% for error in form.name.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="father_or_husband">Father/Husband Name:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.father_or_husband(class_="form-input", id="father_or_husband") }}
+            {{ form.father_or_husband(class_="form-input", id="father_or_husband",placeholder="Please enter your father/husband name here..") }}
             {% for error in form.father_or_husband.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="cnic">CNIC:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.cnic(class_="form-input", id="cnic") }}
-            {% for error in form.cnic.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
+            <input type="text"
+                name="cnic"
+                id="cnic"
+                class="form-input"
+                maxlength="15"
+                placeholder="12345-1122334-5"
+                autocomplete="off"
+                required>
+            <span class="form-error" id="cnicError" style="display:none;"></span>
         </div>
+
         <div class="form-block">
             <label for="email">Email:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.email(class_="form-input", id="email") }}
+            {{ form.email(class_="form-input", id="email", placeholder="Please enter your email  e.g example@gmail.com") }}
             {% for error in form.email.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
@@ -77,61 +84,72 @@
             {% endfor %}
         </div>
         <div class="form-block">
-            <label for="height">Height (cm):<span style="font-weight:400; color:#aaa;">(optional)</span></label>
-            {{ form.height(class_="form-input", id="height") }}
-            {% for error in form.height.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
-        </div>
-        <div class="form-block">
             <label for="weight">Weight (kg):<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.weight(class_="form-input", id="weight") }}
+            {{ form.weight(class_="form-input", id="weight", placeholder="Please enter your weight here..") }}
             {% for error in form.weight.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
+            <label for="height">Height (cm):<span style="font-weight:400; color:#aaa;">(optional)</span></label>
+            {{ form.height(class_="form-input", id="height", placeholder="Please enter your height here..") }}
+            {% for error in form.height.errors %}
+                <span class="form-error">{{ error }}</span>
+            {% endfor %}
+        </div>
+        <div class="form-block">
             <label for="waist">Waist (cm):<span style="font-weight:400; color:#aaa;">(optional)</span></label>
-            {{ form.waist(class_="form-input", id="waist") }}
+            {{ form.waist(class_="form-input", id="waist", placeholder="Please enter your waist here..") }}
             {% for error in form.waist.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="profession">Profession:<span style="font-weight:400; color:#aaa;">(optional)</span></label>
-            {{ form.profession(class_="form-input", id="profession") }}
+            {{ form.profession(class_="form-input", id="profession", placeholder="Please enter your profession here..") }}
             {% for error in form.profession.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="nationality">Nationality:<span style="font-weight:400; color:#aaa;">(optional)</span></label>
-            {{ form.nationality(class_="form-input", id="nationality") }}
+            {{ form.nationality(class_="form-input", id="nationality", placeholder="Please enter your nationality here..") }}
             {% for error in form.nationality.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="address">Address:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.address(class_="form-input textarea-nonresize", id="address") }}
+            {{ form.address(class_="form-input textarea-nonresize", id="address", placeholder="Please enter your address here..") }}
             {% for error in form.address.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="phone">Phone Number:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.phone(class_="form-input", id="phone") }}
-            {% for error in form.phone.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
+            <input type="text"
+                name="phone"
+                id="phone"
+                class="form-input"
+                maxlength="11"
+                placeholder="03XXXXXXXXX"
+                autocomplete="off"
+                required>
+            <span class="form-error" id="phoneError" style="display:none;"></span>
         </div>
         <div class="form-block">
             <label for="emergency_contact">Emergency Contact No:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.emergency_contact(class_="form-input", id="emergency_contact") }}
-            {% for error in form.emergency_contact.errors %}
-                <span class="form-error">{{ error }}</span>
-            {% endfor %}
+            <input type="text"
+                name="emergency_contact"
+                id="emergency_contact"
+                class="form-input"
+                maxlength="11"
+                placeholder="03XXXXXXXXX"
+                autocomplete="off"
+                required>
+            <span class="form-error" id="emergencyContactError" style="display:none;"></span>
         </div>
+        
         <div class="form-block">
     <label for="training_type">Training Type:<span style="font-weight:400; color:#FF0000;">*</span></label>
     {{ form.training_type(class_="form-input", id="training_type") }}
@@ -186,14 +204,14 @@
         </div>
         <div class="form-block">
             <label for="illnesses">Do you suffer from any of these illnesses?:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.illnesses(class_="form-input", id="illnesses") }}
+            {{ form.illnesses(class_="form-input", id="illnesses", placeholder="Please select your illnesses or decribe if any here..") }}
             {% for error in form.illnesses.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="join_reasons">Why do you want to join?:<span style="font-weight:400; color:#FF0000;">*</span></label>
-            {{ form.join_reasons(class_="form-input", id="join_reasons") }}
+            {{ form.join_reasons(class_="form-input", id="join_reasons" , placeholder="Please select your reasons or decribe if any here..") }}
             {% for error in form.join_reasons.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
@@ -235,6 +253,49 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const phoneInput = document.getElementById('phone');
+    const phoneError = document.getElementById('phoneError');
+
+    phoneInput.addEventListener('input', function() {
+        let value = phoneInput.value;
+
+        // Check for international code and limit to 11 digits
+        if (value.startsWith('+')) {
+            phoneError.innerText = "Please enter without country code (e.g., 03001234567).";
+            phoneError.style.display = 'block';
+        } else if (value.length > 11) {
+            phoneInput.value = value.slice(0, 11);
+            phoneError.style.display = 'none';
+        } else {
+            phoneError.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emergencyContactInput = document.getElementById('emergency_contact');
+    const emergencyContactError = document.getElementById('emergencyContactError');
+
+    emergencyContactInput.addEventListener('input', function() {
+        let value = emergencyContactInput.value;
+        // Check for international code and limit to 11 digits
+        if (value.startsWith('+')) {
+            emergencyContactError.innerText = "Please enter without country code (e.g., 03001234567).";
+            emergencyContactError.style.display = 'block';
+        } else if (value.length > 11) {
+            emergencyContactInput.value = value.slice(0, 11);
+            emergencyContactError.style.display = 'none';
+        } else {
+            emergencyContactError.style.display = 'none';
+        }
+    });
+});
+</script>
 
 
 <script>
@@ -375,6 +436,57 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cnicInput = document.getElementById('cnic');
+    const cnicError = document.getElementById('cnicError');
+
+    cnicInput.addEventListener('input', function() {
+        // Only numbers, then add dashes
+        let value = cnicInput.value.replace(/[^0-9]/g, '');
+        if (value.length > 5) value = value.slice(0,5) + '-' + value.slice(5);
+        if (value.length > 13) value = value.slice(0,13) + '-' + value.slice(13,14);
+        cnicInput.value = value.slice(0,15);
+
+        // Format check
+        const regex = /^\d{5}-\d{7}-\d{1}$/;
+        if (cnicInput.value.length === 15 && !regex.test(cnicInput.value)) {
+            cnicError.innerText = "Format: 36601-7763859-5";
+            cnicError.style.display = 'block';
+            return;
+        } else {
+            cnicError.style.display = 'none';
+        }
+        // Only check existence if format is good
+        if (regex.test(cnicInput.value)) {
+            fetch('/check_cnic', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'cnic=' + encodeURIComponent(cnicInput.value)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.exists) {
+                    cnicError.innerText = "This CNIC is already registered.";
+                    cnicError.style.display = 'block';
+                } else {
+                    cnicError.style.display = 'none';
+                }
+            });
+        }
+    });
+});
+</script>
+
+<script>
+document.querySelector('.customer-form').addEventListener('submit', function(e) {
+    const cnicError = document.getElementById('cnicError');
+    if (cnicError.style.display === 'block') {
+        cnicInput.focus();
+        e.preventDefault();
+    }
+});
+</script>
 
 <script>
     $(document).ready(function() {

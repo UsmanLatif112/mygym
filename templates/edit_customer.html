@@ -22,14 +22,14 @@
 
         <div class="form-block">
             <label for="name">Full Name</label>
-            {{ form.name(class_="form-input", id="name") }}
+            {{ form.name(class_="form-input", id="name", placeholder="Please enter your name here..") }}
             {% for error in form.name.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="father_or_husband">Father/Husband Name</label>
-            {{ form.father_or_husband(class_="form-input", id="father_or_husband") }}
+            {{ form.father_or_husband(class_="form-input", id="father_or_husband", placeholder="Please enter your father/husband name here..") }}
             {% for error in form.father_or_husband.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
@@ -43,7 +43,7 @@
         </div>
         <div class="form-block">
             <label for="email">Email</label>
-            {{ form.email(class_="form-input", id="email") }}
+            {{ form.email(class_="form-input", id="email", placeholder="Please enter your email here..") }}
             {% for error in form.email.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
@@ -78,63 +78,63 @@
         </div>
         <div class="form-block">
             <label for="height">Height (cm)</label>
-            {{ form.height(class_="form-input", id="height") }}
+            {{ form.height(class_="form-input", id="height", placeholder="Please enter your height here..") }}
             {% for error in form.height.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="weight">Weight (kg)</label>
-            {{ form.weight(class_="form-input", id="weight") }}
+            {{ form.weight(class_="form-input", id="weight", placeholder="Please enter your weight here..") }}
             {% for error in form.weight.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="waist">Waist (cm) <span style="font-weight:400; color:#aaa;">(optional)</span></label>
-            {{ form.waist(class_="form-input", id="waist") }}
+            {{ form.waist(class_="form-input", id="waist", placeholder="Please enter your waist measurement here..") }}
             {% for error in form.waist.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="profession">Profession</label>
-            {{ form.profession(class_="form-input", id="profession") }}
+            {{ form.profession(class_="form-input", id="profession", placeholder="Please enter your profession here..") }}
             {% for error in form.profession.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="nationality">Nationality</label>
-            {{ form.nationality(class_="form-input", id="nationality") }}
+            {{ form.nationality(class_="form-input", id="nationality", placeholder="Please enter your nationality here..") }}
             {% for error in form.nationality.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="address">Address</label>
-            {{ form.address(class_="form-input textarea-nonresize", id="address") }}
+            {{ form.address(class_="form-input textarea-nonresize", id="address", placeholder="Please enter your address here..") }}
             {% for error in form.address.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="phone">Phone Number</label>
-            {{ form.phone(class_="form-input", id="phone") }}
+            {{ form.phone(class_="form-input", id="phone", placeholder="Please enter your phone number here..") }}
             {% for error in form.phone.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
             <label for="emergency_contact">Emergency Contact No</label>
-            {{ form.emergency_contact(class_="form-input", id="emergency_contact") }}
+            {{ form.emergency_contact(class_="form-input", id="emergency_contact", placeholder="Please enter your emergency contact number here..") }}
             {% for error in form.emergency_contact.errors %}
                 <span class="form-error">{{ error }}</span>
             {% endfor %}
         </div>
         <div class="form-block">
     <label for="training_type">Training Type</label>
-    {{ form.training_type(class_="form-input", id="training_type") }}
+    {{ form.training_type(class_="form-input", id="training_type", placeholder="Please select training type") }}
     {% for error in form.training_type.errors %}
         <span class="form-error">{{ error }}</span>
     {% endfor %}

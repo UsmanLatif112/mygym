@@ -89,6 +89,22 @@ def customers():
     # Pass packages_dict to the template
     return render_template("customers.html", customers=customers_list, packages_dict=packages_dict)
 
+@app.route('/update_customer_status/<int:customer_id>', methods=['POST'])
+def update_customer_status(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    new_status = request.json.get('status')
+    if new_status in ['active', 'inactive']:
+        customer.status = new_status
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'success': False}), 400
+
+@app.route('/check_cnic', methods=['POST'])
+def check_cnic():
+    cnic = request.form.get('cnic')
+    exists = Customer.query.filter_by(cnic=cnic).first() is not None
+    return jsonify({'exists': exists})
+
 @app.route('/add_customer', methods=['GET', 'POST'])
 def add_customer():
     form = CustomerForm()
@@ -485,6 +501,14 @@ def delete_employee(employee_id):
     db.session.commit()
     flash('Employee deleted successfully!', 'success')
     return redirect(url_for('employees'))
+
+@app.route('/delete_salary_entry/<int:entry_id>', methods=['GET', 'POST'])
+def delete_salary_entry(entry_id):
+    entry = SalaryHistory.query.get_or_404(entry_id)
+    db.session.delete(entry)
+    db.session.commit()
+    flash('Salary entry deleted successfully!', 'success')
+    return redirect(url_for('manage_employee', employee_id=entry.employee_id))
 
 @app.route('/employees')
 @login_required
@@ -892,6 +916,80 @@ def registration_success():
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+# List users
+@app.route('/users')
+def users():
+    all_users = User.query.all()
+    return render_template('user_management.html', users=all_users)
+
+# Add user
+@app.route('/add_user', methods=['POST'])
+def add_user():
+    username = request.form.get('username').strip()
+    role_id = request.form.get('role_id')
+    password = request.form.get('password')
+    confirm = request.form.get('confirm_password')
+
+    # Validate role
+    if role_id not in ['1', '2']:
+        flash('Invalid role selected.', 'error')
+        return redirect(url_for('users'))
+
+    # Validate password
+    if password != confirm:
+        flash('Passwords do not match.', 'error')
+        return redirect(url_for('users'))
+
+    # Check existing username
+    if User.query.filter_by(username=username).first():
+        flash('Username already exists.', 'error')
+        return redirect(url_for('users'))
+
+    user = User(username=username, role_id=role_id)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    flash('User added successfully.', 'success')
+    return redirect(url_for('users'))
+
+# Edit user
+@app.route('/edit_user/<int:user_id>', methods=['POST'])
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    username = request.form.get('username').strip()
+    role_id = request.form.get('role_id')
+    password = request.form.get('password')
+
+    # Validate role
+    if role_id not in ['1', '2']:
+        flash('Invalid role selected.', 'error')
+        return redirect(url_for('users'))
+
+    user.username = username
+    user.role_id = role_id
+    if password:
+        user.set_password(password)
+
+    db.session.commit()
+    flash('User updated successfully.', 'success')
+    return redirect(url_for('users'))
+
+# Delete user
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('User deleted successfully.', 'success')
+    return redirect(url_for('users'))
+
+# Optional: Check username availability (AJAX)
+@app.route('/check_username', methods=['POST'])
+def check_username():
+    username = request.form.get('username').strip()
+    exists = User.query.filter_by(username=username).first() is not None
+    return jsonify({'exists': exists})
 
 if __name__ == '__main__':
     with app.app_context():
