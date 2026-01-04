@@ -451,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Format check
         const regex = /^\d{5}-\d{7}-\d{1}$/;
         if (cnicInput.value.length === 15 && !regex.test(cnicInput.value)) {
-            cnicError.innerText = "Format: 36601-7763859-5";
+            cnicError.innerText = "Format: 12345-1234567-1";
             cnicError.style.display = 'block';
             return;
         } else {

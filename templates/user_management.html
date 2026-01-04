@@ -56,7 +56,7 @@
     <form id="addUserForm" method="POST" action="{{ url_for('add_user') }}">
       <div class="form-block" style="margin-bottom:10px;">
         <label>Username:</label>
-        <input type="text" name="username" id="add_username" class="form-input" required>
+        <input type="text" name="username" id="add_username" placeholder="Enter username" class="form-input" required>
         <span id="username-error" class="form-error" style="color:#d90429;"></span>
       </div>
       <div class="form-block" style="margin-bottom:10px;">
@@ -70,7 +70,7 @@
 
       <div class="form-block" style="margin-bottom:15px; position:relative;">
         <label>Password:</label>
-        <input type="password" name="password" id="add_password" class="form-input" required>
+        <input type="password" name="password" id="add_password" placeholder="Enter password" class="form-input" required>
         <i id="add_password_toggle" class="fa fa-eye toggle-password" 
            style="position:absolute;padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
            onclick="togglePassword('add_password')"></i>
@@ -78,7 +78,7 @@
 
       <div class="form-block" style="margin-bottom:15px; position:relative;">
         <label>Confirm Password:</label>
-        <input type="password" name="confirm_password" id="add_confirm_password" class="form-input" required>
+        <input type="password" name="confirm_password" id="add_confirm_password" placeholder="Confirm password" class="form-input" required>
         <i id="add_confirm_toggle" class="fa fa-eye toggle-password" 
            style="position:absolute; padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
            onclick="togglePassword('add_confirm_password')"></i>
@@ -101,7 +101,7 @@
       <input type="hidden" name="user_id" id="edit_user_id">
       <div class="form-block" style="margin-bottom:10px;">
         <label>Username:</label>
-        <input type="text" name="username" id="edit_username" class="form-input" required>
+        <input type="text" name="username" placeholder="Enter username" id="edit_username" class="form-input" required>
       </div>
       <div class="form-block" style="margin-bottom:10px;">
         <label>Role:</label>
@@ -113,7 +113,7 @@
 
       <div class="form-block" style="margin-bottom:15px; position:relative;">
         <label>Password (leave blank to keep current):</label>
-        <input type="password" name="password" id="edit_password" class="form-input">
+        <input type="password" name="password" placeholder="Enter password leave if not changing" id="edit_password" class="form-input">
         <i id="edit_password_toggle" class="fa fa-eye toggle-password" 
            style="position:absolute; padding-top:17px; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
            onclick="togglePassword('edit_password')"></i>
@@ -121,7 +121,7 @@
 
       <div class="form-block" style="margin-bottom:15px; position:relative;">
         <label>Confirm Password:</label>
-        <input type="password" name="confirm_password" id="edit_confirm_password" class="form-input">
+        <input type="password" name="confirm_password" placeholder="Enter password leave if not changing" id="edit_confirm_password" class="form-input">
         <i id="edit_confirm_toggle" class="fa fa-eye toggle-password" 
            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; display:none;"
            onclick="togglePassword('edit_confirm_password')"></i>

@@ -111,7 +111,7 @@
               id="cnic"
               class="form-input"
               maxlength="15"
-              placeholder="36601-7763859-5"
+              placeholder="12345-1234567-1"
               autocomplete="off"
               required>
         <span class="form-error" id="cnicError" style="display:none;"></span>
@@ -155,7 +155,7 @@
       </div>
       <div class="form-block" style="margin-bottom:10px;">
         <label for="salary">Salary:</label>
-        {{ form.salary(class_="form-input", id="salary") }}
+        {{ form.salary(class_="form-input", id="salary", placeholder="Enter salary amount") }}
       </div>
       <div class="form-block" style="margin-bottom:10px;">
         <label for="status">Status:</label>
@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const regex = /^\d{5}-\d{7}-\d{1}$/;
         if (cnicInput.value.length === 15 && !regex.test(cnicInput.value)) {
-            cnicError.innerText = "Format: 36601-7763859-5";
+            cnicError.innerText = "Format: 12345-1234567-1";
             cnicError.style.display = 'block';
             addBtn.disabled = true;
             return;

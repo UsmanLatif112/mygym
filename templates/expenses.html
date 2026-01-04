@@ -65,19 +65,19 @@
   <div class="modal-content" style="max-width:400px;">
     <h2>Add Expense</h2>
     <form method="POST" action="{{ url_for('add_expense') }}">
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom:15px;">
         <label>Expense Name:</label>
-        <input type="text" name="name" class="form-input" required>
+        <input type="text" name="name" placeholder="Enter expense name" class="form-input" required>
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom:15px;">
         <label>Description:</label>
-        <input type="text" name="description" class="form-input">
+        <input type="text" name="description" placeholder="Enter description (optional)" class="form-input">
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom:15px;">
         <label>Amount:</label>
-        <input type="number" min="0" step="1" name="amount" class="form-input" required>
+        <input type="number" min="0" step="1" placeholder="Enter amount" name="amount" class="form-input" required>
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom:15px;">
         <label>Paid By:</label>
         <select name="paid_by" class="form-input" required>
             <option value="">Select Employee</option>
@@ -86,7 +86,7 @@
             {% endfor %}
         </select>
       </div>
-      <div class="form-block">
+      <div class="form-block" style="margin-bottom:15px;">
         <label>Payment Method:</label>
         <select name="payment_method" class="form-input" id="expense_payment_method" required>
           <option value="">Select Method</option>
@@ -94,9 +94,9 @@
           <option value="Online">Online</option>
         </select>
       </div>
-      <div class="form-block" id="expense_transaction_id_row" style="display:none;">
+      <div class="form-block" id="expense_transaction_id_row" style="display:none; margin-bottom:15px;">
         <label>Transaction ID:</label>
-        <input type="text" name="transaction_id" id="expense_transaction_id" class="form-input">
+        <input type="text" name="transaction_id" placeholder="Enter transaction ID" id="expense_transaction_id" class="form-input">
       </div>
       <div class="form-block" style="display: flex; gap: 10px;">
         <button type="submit" class="leet-btn">Save Expense</button>

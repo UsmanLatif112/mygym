@@ -7,7 +7,7 @@ with app.app_context():
 
     # Change these values as you wish
     username = 'admin'
-    password = 'admin 123'
+    password = 'admin123'
     role_id = 1
 
     if not User.query.filter_by(username=username).first():
@@ -49,7 +49,7 @@ with app.app_context():
 # from app import app, db
 # from models import Customer
 
-# cnic = "36601-7763859-5"
+# cnic = "12345-1234567-1"
 
 # with app.app_context():
 #     customer = Customer.query.filter_by(cnic=cnic).first()
