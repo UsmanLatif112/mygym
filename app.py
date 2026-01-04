@@ -2,7 +2,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash, abo
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import BillingHistory, db, User, Customer, Billing, Packages,Employee, Attendance
-from models import db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory
+from models import db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
 from forms import LoginForm, CustomerForm, EmployeeForm
 from datetime import datetime
 import json
@@ -11,7 +11,7 @@ from flask import redirect, url_for
 from sqlalchemy import or_
 from flask import request, jsonify
 from datetime import datetime, timedelta
-from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no
+from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no, serialize_billing_history
 
 
 
@@ -330,13 +330,11 @@ def delete_customer(cnic):
 @login_required
 def update_status(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-    # Always use package_id and fetch the package object!
     package_obj = Packages.query.get(customer.package_id)
 
     package_price = float(package_obj.package_price) if package_obj and package_obj.package_price else 0
     registration_fees = float(request.form.get('registration_fees', 0))
     total_amount = package_price + registration_fees
-
     paid_amount = float(request.form.get('paid_amount', 0))
     remaining_amount = total_amount - paid_amount
     next_billing_date = request.form.get('next_billing_date')
@@ -349,14 +347,22 @@ def update_status(cnic):
         customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
     customer.status = 'Active'
 
+    # Update or create remaining amount
+    remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).first()
+    if not remaining_entry:
+        remaining_entry = RemainingAmount(membership_no=customer.membership_no, remaining_amount=remaining_amount)
+        db.session.add(remaining_entry)
+    else:
+        remaining_entry.remaining_amount = remaining_amount
+
     # Save billing record
     billing = Billing(
         customer_name=customer.name,
         membership_no=customer.membership_no,
         customer_cnic=customer.cnic,
-        paid_to_be_amount=total_amount,  # total package amount
+        paid_to_be_amount=total_amount,
         paid_amount=paid_amount,
-        remaining_amount=remaining_amount,
+        remaining_amount=remaining_entry.remaining_amount,
         payment_collected_by=payment_collected_by,
         payment_method=payment_method,
         transaction_id=transaction_id if transaction_id else None,
@@ -369,19 +375,20 @@ def update_status(cnic):
         customer_cnic=customer.cnic,
         customer_name=customer.name,
         membership_no=customer.membership_no,
-        amount_to_be_paid=total_amount,      # total package amount
-        paid_amount=paid_amount,             # paid this time
-        remaining_amount=remaining_amount,   # remaining after this payment
+        amount_to_be_paid=total_amount,
+        paid_amount=paid_amount,
+        remaining_amount=remaining_entry.remaining_amount,
         payment_collected_by=payment_collected_by,
         payment_method=payment_method,
         transaction_id=transaction_id if transaction_id else None,
-        payment_date=datetime.utcnow()       # payment date/time
+        payment_date=datetime.utcnow()
     )
     db.session.add(billing_history)
-    db.session.commit()
 
+    db.session.commit()
     flash('Status and payment updated successfully.', 'success')
     return redirect(url_for('manage_customer', cnic=customer.cnic))
+
 
 @app.route('/customer_billing/<cnic>')
 @login_required
@@ -445,18 +452,17 @@ def edit_employee_by_cnic(cnic):
         return abort(403)
     employee = Employee.query.filter_by(cnic=cnic).first_or_404()
     form = EmployeeForm(request.form)
-    # Set choices for SelectFields (as before)
     form.employment_type.choices = [('Owner', 'Owner'), ('Trainer', 'Trainer'), ('Office Boy', 'Office Boy')]
     form.shift.choices = [('Morning', 'Morning'), ('Evening', 'Evening'), ('Night', 'Night')]
     form.status.choices = [('Active', 'Active'), ('Inactive', 'Inactive')]
     form.cnic.data = employee.cnic
-    form._current_employee = employee  # <-- This disables uniqueness check
+    form._current_employee = employee
 
     if form.validate_on_submit():
         employee.name = form.name.data
         employee.employment_type = form.employment_type.data
         employee.phone_number = form.phone_number.data
-        employee.timing = form.timing.data
+        employee.timing = request.form.get('timing', '')  # Ensure this retrieves the correct value
         employee.shift = form.shift.data
         employee.salary = form.salary.data
         employee.status = form.status.data
@@ -466,6 +472,7 @@ def edit_employee_by_cnic(cnic):
         print("Form errors:", form.errors)
         flash('There was an error updating the employee.', 'danger')
     return redirect(url_for('manage_employee', employee_id=employee.id))
+
 
 @app.route('/add_employee', methods=['POST'])
 @login_required
@@ -661,18 +668,18 @@ def billing_history(cnic):
     pkg = Packages.query.get(customer.package_id)
     package_price = float(pkg.package_price) if pkg and pkg.package_price else 0
 
-    # Get "current" remaining from Billing table (single row per customer)
     billing = Billing.query.filter_by(customer_cnic=customer.cnic).order_by(Billing.payment_date.desc()).first()
     previous_remaining = billing.remaining_amount if billing else 0
     current_balance = billing.remaining_amount if billing else 0
     amount_to_be_paid = package_price + previous_remaining
 
     history = BillingHistory.query.filter_by(customer_cnic=cnic).order_by(BillingHistory.payment_date.desc()).all()
+    serialized_history = [serialize_billing_history(b) for b in history]
 
     return render_template(
         'billing_history.html',
         customer=customer,
-        history=history,
+        history=serialized_history,
         employees=employees,
         current_balance=current_balance,
         package_name=pkg.package_name if pkg else '',
@@ -681,13 +688,33 @@ def billing_history(cnic):
         amount_to_be_paid=amount_to_be_paid,
     )
 
+
 @app.route('/delete_billing_history/<int:billing_id>/<cnic>', methods=['POST'])
 @login_required
 def delete_billing_history(billing_id, cnic):
+    # Fetch the billing history entry
     history = BillingHistory.query.get_or_404(billing_id)
+
+    # Delete the billing history entry
     db.session.delete(history)
     db.session.commit()
-    flash('Billing entry deleted.', 'success')
+
+    # Fetch and delete the corresponding entry from RemainingAmount
+    remaining_entry = RemainingAmount.query.filter_by(membership_no=history.membership_no, remaining_amount=history.remaining_amount).first()
+    if remaining_entry:
+        db.session.delete(remaining_entry)
+        db.session.commit()
+
+    # Fetch the most recent remaining amount entry
+    recent_remaining_entry = RemainingAmount.query.filter_by(membership_no=history.membership_no).order_by(RemainingAmount.created_at.desc()).first()
+
+    # Update the billing record with the most recent remaining amount
+    billing = Billing.query.filter_by(customer_cnic=cnic).first()
+    if billing and recent_remaining_entry:
+        billing.remaining_amount = recent_remaining_entry.remaining_amount
+        db.session.commit()
+
+    flash('Billing entry and corresponding remaining amount entry deleted.', 'success')
     return redirect(url_for('billing_history', cnic=cnic))
 
 @app.route('/add_billing_history/<cnic>', methods=['POST'])
@@ -696,11 +723,25 @@ def add_billing_history(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
     pkg = Packages.query.get(customer.package_id)
     package_price = float(pkg.package_price) if pkg and pkg.package_price else 0
-    billing = Billing.query.filter_by(customer_cnic=customer.cnic).order_by(Billing.payment_date.desc()).first()
-    previous_remaining = billing.remaining_amount if billing else 0
-    amount_to_be_paid = package_price + previous_remaining
     paid_amount = float(request.form.get('paid_amount', 0))
+    payment_collected_by = request.form.get('payment_collected_by')
+    payment_method = request.form.get('payment_method', 'Unknown')
+    transaction_id = request.form.get('transaction_id', None)
+
+    # Fetch the most recent remaining amount
+    last_remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).order_by(RemainingAmount.created_at.desc()).first()
+    last_remaining = last_remaining_entry.remaining_amount if last_remaining_entry else 0
+
+    # Calculate new remaining amount
+    amount_to_be_paid = package_price + last_remaining
     new_remaining = max(amount_to_be_paid - paid_amount, 0)
+
+    # Add new entry to RemainingAmount
+    new_remaining_entry = RemainingAmount(
+        membership_no=customer.membership_no,
+        remaining_amount=new_remaining
+    )
+    db.session.add(new_remaining_entry)
 
     # Save new BillingHistory entry
     billing_history = BillingHistory(
@@ -710,14 +751,15 @@ def add_billing_history(cnic):
         amount_to_be_paid=amount_to_be_paid,
         paid_amount=paid_amount,
         remaining_amount=new_remaining,
-        payment_collected_by=request.form.get('payment_collected_by'),
-        payment_method=request.form.get('payment_method', 'Unknown'),
-        transaction_id=request.form.get('transaction_id', None),
+        payment_collected_by=payment_collected_by,
+        payment_method=payment_method,
+        transaction_id=transaction_id,
         payment_date=datetime.utcnow()
     )
     db.session.add(billing_history)
 
     # Update or create Billing entry (for statement/balance)
+    billing = Billing.query.filter_by(customer_cnic=customer.cnic).first()
     if not billing:
         billing = Billing(
             customer_name=customer.name,
@@ -726,9 +768,9 @@ def add_billing_history(cnic):
             paid_to_be_amount=amount_to_be_paid,
             paid_amount=paid_amount,
             remaining_amount=new_remaining,
-            payment_collected_by=request.form.get('payment_collected_by'),
-            payment_method=request.form.get('payment_method', 'Unknown'),
-            transaction_id=request.form.get('transaction_id', None),
+            payment_collected_by=payment_collected_by,
+            payment_method=payment_method,
+            transaction_id=transaction_id,
             payment_date=datetime.utcnow()
         )
         db.session.add(billing)
@@ -736,9 +778,9 @@ def add_billing_history(cnic):
         billing.paid_to_be_amount = amount_to_be_paid
         billing.paid_amount = paid_amount
         billing.remaining_amount = new_remaining
-        billing.payment_collected_by = request.form.get('payment_collected_by')
-        billing.payment_method = request.form.get('payment_method', 'Unknown')
-        billing.transaction_id = request.form.get('transaction_id', None)
+        billing.payment_collected_by = payment_collected_by
+        billing.payment_method = payment_method
+        billing.transaction_id = transaction_id
         billing.payment_date = datetime.utcnow()
 
     db.session.commit()
@@ -837,6 +879,14 @@ def packages():
             return jsonify({'success': True, 'message': 'Package updated successfully.'})
 
     return render_template('packages.html', packages=all_packages)
+
+@app.route('/delete_package/<int:package_id>', methods=['POST'])
+@login_required
+def delete_package(package_id):
+    package = Packages.query.get_or_404(package_id)
+    db.session.delete(package)
+    db.session.commit()
+    return jsonify({'success': True})
 
 # terms and conditions route===========
 

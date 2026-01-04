@@ -37,8 +37,23 @@ def parse_tagify(data):
         return ', '.join(tag['value'] for tag in tags if tag.get('value'))
     except Exception:
         return data or ''
-    
-    
+
+def serialize_billing_history(billing_history):
+    return {
+        'id': billing_history.id,
+        'customer_cnic': billing_history.customer_cnic,
+        'customer_name': billing_history.customer_name,
+        'membership_no': billing_history.membership_no,
+        'amount_to_be_paid': billing_history.amount_to_be_paid,
+        'paid_amount': billing_history.paid_amount,
+        'remaining_amount': billing_history.remaining_amount,
+        'payment_collected_by': billing_history.payment_collected_by,
+        'payment_method': billing_history.payment_method,
+        'transaction_id': billing_history.transaction_id,
+        'payment_date': billing_history.payment_date.strftime('%Y-%m-%d')  # Convert to string here
+    }
+
+
     
 def get_customer_type(package):
     if not package:

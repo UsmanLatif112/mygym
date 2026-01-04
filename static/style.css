@@ -59,8 +59,9 @@ body {
 }
 
 .login-btn:hover {
-    background: #ffb347;
-    color: #232323;
+    background: linear-gradient(90deg, #ffb347, #ff7300 70%);
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 
@@ -203,8 +204,9 @@ body {
 }
 
 .filter-apply-btn:hover {
-    background: #ffb347;
-    color: #232323;
+    background: linear-gradient(90deg, #ffb347, #ff7300 70%);
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 .accounts-filter-bar {
@@ -276,8 +278,9 @@ body {
 }
 
 .filter-apply-btn:hover {
-    background: #ffb347;
-    color: #232323;
+    background: linear-gradient(90deg, #ffb347, #ff7300 70%);
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 
@@ -531,6 +534,7 @@ body, .main-content, .login-container {
 .manage-btn:hover, .manage-btn:focus {
     background: linear-gradient(90deg, #ffb347, #ff7300 70%);
     color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 .manage-customer-card {
@@ -573,6 +577,7 @@ body, .main-content, .login-container {
 .manage-btn:hover, .manage-btn:focus {
     background: linear-gradient(90deg, #ffb347, #ff7300 70%);
     color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 
@@ -676,7 +681,8 @@ body, .main-content, .login-container {
 }
 .leet-btn:hover {
   background: linear-gradient(90deg, #ffb347, #ff7300 70%);
-  color: #111;
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }
 
 .select2-container .select2-selection--single,
@@ -932,7 +938,7 @@ select.form-input {
 .status-unpaid { background: #ffa502; color: #fff; }
 .status-inactive { background: #fa5252; color: #fff; }
 
-.leet-btn.delete-btn { background:#ff3333; color:#fff; }
+.leet-btn.delete-btn { background:#e91515; color:#fff; }
 .leet-btn.back-btn-orange { background:#232323; color:#ff7300; }
 
 .customer-divider {
@@ -1085,7 +1091,7 @@ select.form-input {
     height: 41px;
     font-size: 1em;
     background: #181818;
-    color: #ffb347;
+    color: #ff7300;
     border: 1px solid #3a3a3a;
     border-radius: 5px;
     padding: 0 14px;
@@ -1094,4 +1100,83 @@ select.form-input {
 .leet-btn {
     height: 41px;
     font-size: 1.08em;
+}
+
+
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+.status-active {
+    background-color: #36b37e;
+    color: #fff;
+}
+
+.status-inactive {
+    background-color: #d90429;
+    color: #fff;
+}
+
+.status-unpaid {
+    background-color: #ff7300;
+    color: #fff;
+}
+
+.sleeted-btn {
+  border: none;
+  border-radius: 7px;
+  padding: 6px 15px;
+  font-weight: 500;
+  font-size: 1em;
+  background: #181818;
+  color: #ff7300;
+  transition: background 0.14s, color 0.14s;
+  cursor: pointer;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  gap: 7px;
+}
+
+.sleeted-btn:hover {
+    background: #333; color: #fff;
+}
+
+
+.leetpk-btn {
+    border: none;
+    border-radius: 7px;
+    padding: 6px 15px;
+    font-weight: 500;
+    font-size: 1em;
+    background: #ff7300;
+    color: #181818;
+    transition: background 0.14s, color 0.14s;
+    cursor: pointer;
+    margin-bottom: 0;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 8px;
+    gap: 7px;
+    height: 33px;
+}
+
+.edit-btn {
+    color: #181818;
+}
+
+.delete-btn {
+    background: #d90429;
+    color: #fff;
+    margin-left: 2px;
+}
+
+.leetpk-btn:hover {
+    
+    background: linear-gradient(90deg, #ffb347, #ff7300 70%);
+    color: #111;
+    box-shadow: 0 4px 16px rgba(255,115,0,0.23);
 }

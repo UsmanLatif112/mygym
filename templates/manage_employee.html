@@ -27,13 +27,13 @@
             <i class="fa fa-edit"></i> Edit
         </button>
         <a href="#" class="sleet-btn delete-btn" onclick="openDeleteConfirmationModal('{{ url_for('delete_employee', employee_id=employee.id) }}', true)">
-    <i class="fa fa-trash"></i> Delete
-</a>
+            <i class="fa fa-trash"></i> Delete
+        </a>
       </div>
     </div>
     <hr class="customer-divider">
     <div class="customers-table-wrap">
-    <table class="customers-table" style="font-size: 0.97em;margin-bottom: 1px;">
+    <table class="customers-table" style="font-size: 0.97em; margin-bottom: 1px;">
         <thead>
             <tr>
                 <th>Type</th>
@@ -100,9 +100,9 @@
                 </td>
                 <td>
                     <form action="{{ url_for('delete_salary_entry', entry_id=s.id) }}" method="post" style="display:inline;">
-                        <button type="button" style="padding-top: 9px;padding-bottom: 5px;width: 50px;height: 33px;" class="leet-btn delete-btn" onclick="openDeleteConfirmationModal('{{ url_for('delete_salary_entry', entry_id=s.id) }}')">
-    <i class="fa fa-trash"></i>
-</button>
+                        <button type="button" style="padding-top: 9px; padding-bottom: 5px; width: 50px; height: 33px;" class="leet-btn delete-btn" onclick="openDeleteConfirmationModal('{{ url_for('delete_salary_entry', entry_id=s.id) }}')">
+                            <i class="fa fa-trash"></i>
+                        </button>
                     </form>
                 </td>
             </tr>
@@ -151,6 +151,7 @@
         {% for error in form.phone_number.errors %}
         <span class="form-error">{{ error }}</span>
         {% endfor %}
+        <span class="form-error" id="phoneError" style="display:none;"></span>
       </div>
       <div class="form-block" style="margin-bottom: 10px;">
         <label for="salary">Salary:</label>
@@ -242,10 +243,6 @@ function confirmDelete() {
 }
 </script>
 
-
-
-
-
 <script>
 function openEditEmployeeModal() {
     const modal = document.getElementById('editEmployeeModal');
@@ -296,11 +293,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const endPeriod = document.getElementById('edit_end_period');
     const timingInput = document.getElementById('edit-timing');
 
+    // Set initial timing from the database
+    function setInitialTiming() {
+        const timing = {{ employee.timing|tojson }};
+        if (timing) {
+            populateTiming(timing);
+            updateTiming();
+        }
+    }
+
     function updateTiming() {
         const start = startTime.value ? `${convertTo12Hour(startTime.value)} ${startPeriod.value}` : '';
         const end = endTime.value ? `${convertTo12Hour(endTime.value)} ${endPeriod.value}` : '';
-        timingInput.value = start && end ? `${start} to ${end}` : '';
-        console.log(timingInput.value); // Debugging: Check the value before submission
+        timingInput.value = start && end ? `${start} to ${end}` : timingInput.value || employee.timing;
     }
 
     function convertTo12Hour(time) {
@@ -310,10 +315,41 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${hour}:${minute}`;
     }
 
+    function populateTiming(existingTiming) {
+        const regex = /(\d{1,2}:\d{2}) (AM|PM) to (\d{1,2}:\d{2}) (AM|PM)/;
+        const parts = existingTiming.match(regex);
+        if (parts) {
+            startTime.value = convertTo24Hour(parts[1], parts[2]);
+            startPeriod.value = parts[2];
+            endTime.value = convertTo24Hour(parts[3], parts[4]);
+            endPeriod.value = parts[4];
+        }
+    }
+
     startTime.addEventListener('change', updateTiming);
     startPeriod.addEventListener('change', updateTiming);
     endTime.addEventListener('change', updateTiming);
     endPeriod.addEventListener('change', updateTiming);
+
+    setInitialTiming(); // Set timing on load
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const phoneInput = document.getElementById('edit-phone_number');
+    const phoneError = document.getElementById('phoneError');
+
+    phoneInput.addEventListener('input', function() {
+        let value = phoneInput.value;
+        if (value.startsWith('+')) {
+            phoneError.innerText = "Please enter without country code (e.g., 03001234567).";
+            phoneError.style.display = 'block';
+        } else if (value.length > 11) {
+            phoneInput.value = value.slice(0, 11);
+            phoneError.style.display = 'none';
+        } else {
+            phoneError.style.display = 'none';
+        }
+    });
 });
 </script>
 
@@ -410,18 +446,14 @@ function openPaySalaryModal() {
 function closePaySalaryModal() {
     document.getElementById('paySalaryModal').style.display = 'none';
 }
-document.addEventListener('DOMContentLoaded', function() {
-    var paymentMethod = document.getElementById('salary_payment_method');
-    var transactionRow = document.getElementById('salary_transaction_id_row');
-    if (paymentMethod) {
-      paymentMethod.addEventListener('change', function() {
-          if (paymentMethod.value === 'Online') {
-              transactionRow.style.display = 'block';
-          } else {
-              transactionRow.style.display = 'none';
-              document.getElementById('salary_transaction_id').value = '';
-          }
-      });
+document.getElementById('salary_payment_method').addEventListener('change', function() {
+    const transactionRow = document.getElementById('salary_transaction_id_row');
+    if (this.value === 'Online') {
+        transactionRow.style.display = 'block';
+        document.getElementById('salary_transaction_id').setAttribute('required', 'required');
+    } else {
+        transactionRow.style.display = 'none';
+        document.getElementById('salary_transaction_id').removeAttribute('required');
     }
 });
 </script>
