@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from sqlalchemy import event
 
 db = SQLAlchemy()
 
@@ -59,7 +60,6 @@ class Customer(db.Model):
     billing_histories = db.relationship('BillingHistory', backref='customer', primaryjoin="Customer.cnic == foreign(BillingHistory.customer_cnic)", cascade="all, delete-orphan")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)  # 1 for active, 10 for deleted
 
 class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -69,7 +69,6 @@ class Invoice(db.Model):
     is_paid = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -82,7 +81,6 @@ class Expense(db.Model):
     date = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Trainer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -92,7 +90,6 @@ class Trainer(db.Model):
     thumb_id = db.Column(db.String(100))  # For attendance
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -115,7 +112,6 @@ class Billing(db.Model):
     transaction_id = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -131,7 +127,6 @@ class Employee(db.Model):
     salaries = db.relationship('SalaryHistory', backref='employee', primaryjoin="Employee.id == foreign(SalaryHistory.employee_id)", cascade="all, delete-orphan")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Packages(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -142,7 +137,6 @@ class Packages(db.Model):
     registration_fees = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class BillingHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -158,7 +152,6 @@ class BillingHistory(db.Model):
     transaction_id = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class SalaryHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -171,12 +164,11 @@ class SalaryHistory(db.Model):
     transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
+
 
 class RemainingAmount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     membership_no = db.Column(db.String(20), nullable=False)
     remaining_amount = db.Column(db.Float, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
