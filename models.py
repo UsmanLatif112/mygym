@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from sqlalchemy import event
 
 db = SQLAlchemy()
 
@@ -59,40 +60,37 @@ class Customer(db.Model):
     billing_histories = db.relationship('BillingHistory', backref='customer', primaryjoin="Customer.cnic == foreign(BillingHistory.customer_cnic)", cascade="all, delete-orphan")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)  # 1 for active, 10 for deleted
+    discount_amount = db.Column(db.Integer, default=0)  # New field for discount amount
 
 class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'))
-    amount = db.Column(db.Float)
+    amount = db.Column(db.Integer)
     date = db.Column(db.Date)
     is_paid = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.String(255), nullable=True)
-    amount = db.Column(db.Float, nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
     paid_by = db.Column(db.String(120), nullable=False)  # Employee name
     payment_method = db.Column(db.String(50), nullable=False)
     transaction_id = db.Column(db.String(100), nullable=True)
     date = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Trainer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120))
-    salary = db.Column(db.Float)
+    salary = db.Column(db.Integer)
     account_no = db.Column(db.String(100))
     thumb_id = db.Column(db.String(100))  # For attendance
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -106,16 +104,16 @@ class Billing(db.Model):
     customer_name = db.Column(db.String(120), nullable=False)
     membership_no = db.Column(db.String(20), nullable=False)
     customer_cnic = db.Column(db.String(20), nullable=False)
-    paid_to_be_amount = db.Column(db.Float, nullable=False)
-    paid_amount = db.Column(db.Float, nullable=False)
-    remaining_amount = db.Column(db.Float, nullable=False)
-    payment_collected_by = db.Column(db.String(100), nullable=False)   # Employee name or ID
+    paid_to_be_amount = db.Column(db.Integer, nullable=False)
+    paid_amount = db.Column(db.Integer, nullable=False)
+    remaining_amount = db.Column(db.Integer, nullable=False)
+    payment_collected_by = db.Column(db.String(100), nullable=False)
     payment_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     payment_method = db.Column(db.String(50), nullable=False)
     transaction_id = db.Column(db.String(50), nullable=True)
+    discount_amount = db.Column(db.Integer, nullable=False, default=0)  # New field for discount
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -124,59 +122,55 @@ class Employee(db.Model):
     employment_type = db.Column(db.String(50), nullable=False)
     timing = db.Column(db.String(50), nullable=True)
     shift = db.Column(db.String(50), nullable=True)
-    salary = db.Column(db.Float, nullable=True)
+    salary = db.Column(db.Integer, nullable=True)
     phone_number = db.Column(db.String(20), nullable=True)
     cnic = db.Column(db.String(20), nullable=True)
     thumb_id = db.Column(db.String(100))  # For attendance
     salaries = db.relationship('SalaryHistory', backref='employee', primaryjoin="Employee.id == foreign(SalaryHistory.employee_id)", cascade="all, delete-orphan")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class Packages(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     package_name = db.Column(db.String(100), nullable=False)
     package_type = db.Column(db.String(50), nullable=False)  # e.g., 'Individual' or 'Personal'
     package_duration = db.Column(db.String(50), nullable=False)  # e.g., '1 Month', '6 Months'
-    package_price = db.Column(db.Float, nullable=False)
-    registration_fees = db.Column(db.Float, nullable=False)
+    package_price = db.Column(db.Integer, nullable=False)
+    registration_fees = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class BillingHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_cnic = db.Column(db.String(20), nullable=False)
     customer_name = db.Column(db.String(120), nullable=False)
     membership_no = db.Column(db.String(20), nullable=False)
-    amount_to_be_paid = db.Column(db.Float, nullable=False)
-    paid_amount = db.Column(db.Float, nullable=False)
-    remaining_amount = db.Column(db.Float, nullable=False)
+    amount_to_be_paid = db.Column(db.Integer, nullable=False)
+    paid_amount = db.Column(db.Integer, nullable=False)
+    remaining_amount = db.Column(db.Integer, nullable=False)
     payment_collected_by = db.Column(db.String(100), nullable=False)
     payment_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     payment_method = db.Column(db.String(50), nullable=False)
     transaction_id = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
 
 class SalaryHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, nullable=False)
     employee_name = db.Column(db.String(120), nullable=False)
-    salary_amount = db.Column(db.Float, nullable=False)
+    salary_amount = db.Column(db.Integer, nullable=False)
     payment_type = db.Column(db.String(20), nullable=False)  # 'Salary' or 'Advance'
     payment_method = db.Column(db.String(50), nullable=False)  # 'Cash' or 'Online'
     transaction_id = db.Column(db.String(100), nullable=True)
     transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
+
 
 class RemainingAmount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     membership_no = db.Column(db.String(20), nullable=False)
-    remaining_amount = db.Column(db.Float, nullable=False, default=0)
+    remaining_amount = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    delete_status = db.Column(db.Integer, default=1)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    

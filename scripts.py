@@ -157,3 +157,68 @@ with app.app_context():
 #         print(f"Updated billing date for membership_no {membership_no} to {new_billing_date}")
 #     else:
 #         print(f"No customer found with membership_no {membership_no}")
+
+
+
+#  @app.route('/update_status/<cnic>', methods=['POST'])
+# @login_required
+# def update_status(cnic):
+#     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+#     package_obj = Packages.query.get(customer.package_id)
+
+#     package_price = float(package_obj.package_price) if package_obj and package_obj.package_price else 0
+#     registration_fees = float(request.form.get('registration_fees', 0))
+#     total_amount = package_price + registration_fees
+#     paid_amount = float(request.form.get('paid_amount', 0))
+#     remaining_amount = total_amount - paid_amount
+#     next_billing_date = request.form.get('next_billing_date')
+#     payment_collected_by = request.form.get('collector_name')
+#     payment_method = request.form.get('payment_method', 'Unknown')
+#     transaction_id = request.form.get('transaction_id', None)
+
+#     # Update customer billing date and status
+#     if next_billing_date:
+#         customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
+#     customer.status = 'Active'
+
+#     # Update or create remaining amount
+#     remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).first()
+#     if not remaining_entry:
+#         remaining_entry = RemainingAmount(membership_no=customer.membership_no, remaining_amount=remaining_amount)
+#         db.session.add(remaining_entry)
+#     else:
+#         remaining_entry.remaining_amount = remaining_amount
+
+#     # Save billing record
+#     billing = Billing(
+#         customer_name=customer.name,
+#         membership_no=customer.membership_no,
+#         customer_cnic=customer.cnic,
+#         paid_to_be_amount=total_amount,
+#         paid_amount=paid_amount,
+#         remaining_amount=remaining_entry.remaining_amount,
+#         payment_collected_by=payment_collected_by,
+#         payment_method=payment_method,
+#         transaction_id=transaction_id if transaction_id else None,
+#         payment_date=datetime.utcnow()
+#     )
+#     db.session.add(billing)
+
+#     # Save billing history record
+#     billing_history = BillingHistory(
+#         customer_cnic=customer.cnic,
+#         customer_name=customer.name,
+#         membership_no=customer.membership_no,
+#         amount_to_be_paid=total_amount,
+#         paid_amount=paid_amount,
+#         remaining_amount=remaining_entry.remaining_amount,
+#         payment_collected_by=payment_collected_by,
+#         payment_method=payment_method,
+#         transaction_id=transaction_id if transaction_id else None,
+#         payment_date=datetime.utcnow()
+#     )
+#     db.session.add(billing_history)
+
+#     db.session.commit()
+#     flash('Status and payment updated successfully.', 'success')
+#     return redirect(url_for('manage_customer', cnic=customer.cnic))

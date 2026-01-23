@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, app, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, User, Customer
@@ -78,3 +78,4 @@ def validate_phone(form, field):
         raise ValidationError('Phone number must be exactly 11 digits.')
     if phone.startswith('+'):
         raise ValidationError('Enter without country code (e.g., 03001234567).')
+    

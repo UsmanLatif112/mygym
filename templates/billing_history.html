@@ -3,7 +3,7 @@
 
 {% if customer.name|length > 12 %}
   <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 10px;" title="{{ customer.name }}">
-      Billing History for, {{ customer.name[:12] }}&hellip;
+      Billing History for, {{ customer.name[:12]  }}&hellip;
   </h1>
 {% else %}
   <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 10px;">
@@ -44,7 +44,7 @@
         <td>{{ b.payment_date }}</td>  <!-- Directly use the string -->
         <td>{{ b.amount_to_be_paid }}</td>
         <td>{{ b.paid_amount }}</td>
-        <td>{{ b.remaining_amount }}</td>
+        <td>{{ b.remaining_amount  }}</td>
         <td>{{ b.payment_method }}</td>
         <td>
             {% if b.payment_method == 'Online' and b.transaction_id %}
@@ -97,9 +97,10 @@
         <input type="text" value="{{ package_name }}" readonly class="form-input">
       </div>
       <div class="form-block" style="margin-bottom:5px;">
-        <label>Amount to be Paid:</label>
-        <input type="number" min="0" step="1" id="modal_amount_to_be_paid" value="{{ amount_to_be_paid }}" readonly class="form-input">
-      </div>
+    <label>Amount to be Paid:</label>
+    <input type="number" min="0" step="1" id="modal_amount_to_be_paid" value="{{ package_price - customer.discount_amount + previous_remaining }}" readonly class="form-input">
+</div>
+
       <div class="form-block" style="margin-bottom:5px;">
         <label>Paid Amount:</label>
         <input type="number" min="0" step="1" placeholder="Enter paid amount" id="modal_paid_amount" name="paid_amount" class="form-input" required>
@@ -284,17 +285,20 @@ function setupModalCalc() {
     var remainingFeesInput = document.getElementById('modal_remaining_fees');
     var amountToBePaidInput = document.getElementById('modal_amount_to_be_paid');
     var amountToBePaid = parseFloat(amountToBePaidInput.value) || 0;
+
     function updateRemaining() {
         var paid = parseFloat(paidAmountInput.value) || 0;
         var rem = amountToBePaid - paid;
-        remainingFeesInput.value = rem >= 0 ? rem : 0;
+        remainingFeesInput.value = rem; // Allow negative values if overpaid
     }
+
     if (paidAmountInput && remainingFeesInput) {
         paidAmountInput.removeEventListener('input', updateRemaining);
         paidAmountInput.addEventListener('input', updateRemaining);
         updateRemaining();
     }
 }
+
 
 document.addEventListener('DOMContentLoaded', function() {
     var paymentMethod = document.getElementById('modal_payment_method');

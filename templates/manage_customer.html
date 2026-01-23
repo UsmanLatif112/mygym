@@ -44,6 +44,7 @@
       {% set pkg = packages_dict.get(customer.package_id) %}
       <div><strong>Type:</strong> <span>{{ pkg.package_type if pkg else 'No data found' }}</span></div>
       <div><strong>Package:</strong> <span>{{ pkg.package_name if pkg else 'No data found' }}</span></div>
+      <div><strong>Discount Amount:</strong> <span>{{ customer.discount_amount or 'No data found' }}</span></div>
       <div><strong>CNIC:</strong> <span>{{ customer.cnic or 'No data found' }}</span></div>
       <div><strong>Email:</strong> <span>{{ customer.email or 'No data found' }}</span></div>
       <div><strong>Phone:</strong> <span>{{ customer.phone or 'No data found' }}</span></div>
@@ -88,6 +89,11 @@
                   <label>Total Amount</label>
                   <input type="text" id="amount-to-be-paid" value="{{ amount_to_be_paid }}" readonly>
               </div>
+              <div class="form-group">
+                <label>Discount Amount</label>
+                <input type="number" min="0" step="1" name="discount_amount" id="discount-amount" value="{{ customer.discount_amount }}" required>
+            </div>
+
               <div class="form-group">
                   <label>Paid Amount</label>
                   <input type="number" min="0" placeholder="Enter paid amount" step="0.01" name="paid_amount" id="paid-amount-input" required>
@@ -300,9 +306,12 @@ document.getElementById('paid-amount-input').oninput = function(){
   document.getElementById('remaining-amount').value = rem >= 0 ? rem : 0;
 };
 
+
+
 document.addEventListener('DOMContentLoaded', function() {
     const packagePriceInput = document.getElementById('package-price');
     const registrationFeesInput = document.getElementById('registration-fees');
+    const discountAmountInput = document.getElementById('discount-amount');
     const totalAmountInput = document.getElementById('amount-to-be-paid');
     const paidAmountInput = document.getElementById('paid-amount-input');
     const remainingFeesInput = document.getElementById('remaining-fees-input');
@@ -310,20 +319,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateTotalAmount() {
         const packagePrice = parseFloat(packagePriceInput.value) || 0;
         const registrationFees = parseFloat(registrationFeesInput.value) || 0;
-        totalAmountInput.value = (packagePrice + registrationFees).toFixed(2);
+        const discountAmount = parseFloat(discountAmountInput.value) || 0;
+        totalAmountInput.value = (packagePrice + registrationFees - discountAmount).toFixed(0);
     }
 
     function updateRemainingFees() {
         const totalAmount = parseFloat(totalAmountInput.value) || 0;
         const paidAmount = parseFloat(paidAmountInput.value) || 0;
-        remainingFeesInput.value = (totalAmount - paidAmount).toFixed(2);
+        remainingFeesInput.value = (totalAmount - paidAmount).toFixed(0);
     }
 
     registrationFeesInput.addEventListener('input', updateTotalAmount);
+    discountAmountInput.addEventListener('input', updateTotalAmount);
     paidAmountInput.addEventListener('input', updateRemainingFees);
     updateTotalAmount(); // Initialize on page load
     updateRemainingFees(); // Initialize on page load
 });
+
 </script>
 
 {% endblock %}

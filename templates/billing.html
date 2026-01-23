@@ -9,6 +9,7 @@
                 <th>Membership#</th>
                 <th>Package</th>
                 <th>Amount</th>
+                <th>Discount</th> <!-- New column for discount -->
                 <th>Remaining</th>   <!-- New column -->
                 <th>Billing Date</th>
                 <th>Action</th>
@@ -29,14 +30,9 @@
         {% set pkg = packages_dict.get(c.package_id) %}
         {{ pkg.package_name if pkg else '' }}
     </td>
-    <td>
-        {% if pkg %}
-            {{ (pkg.package_price|float + pkg.registration_fees|float)|round(2) }}
-        {% else %}
-            N/A
-        {% endif %}
-    </td>
-    <td>{{ billing_dict.get(c.cnic, 0) }}</td>
+    <td>{{ billing_dict[c.cnic].paid_to_be_amount}}</td> <!-- Display paid_to_be_amount -->
+    <td>{{ billing_dict[c.cnic].discount_amount }}</td> <!-- Display discount amount -->
+    <td>{{ billing_dict[c.cnic].remaining_amount }}</td>
     <td>{{ c.billing_date.strftime('%Y-%m-%d') if c.billing_date else 'N/A' }}</td>
     <td>
         <a href="{{ url_for('billing_history', cnic=c.cnic) }}" class="manage-btn">Manage</a>
