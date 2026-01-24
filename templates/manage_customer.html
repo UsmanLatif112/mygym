@@ -160,6 +160,23 @@
   </div>
 </div>
 
+<!-- Billing Date Modal -->
+<div id="billingDateModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width: 400px; padding: 20px;">
+      <h2 style="margin: 0 0 20px;">Update Billing Date</h2>
+      <form id="billingDateForm" method="POST" action="{{ url_for('update_billing_date', cnic=customer.cnic) }}">
+          <div class="form-group">
+              <label>Current Billing Date:</label>
+              <input type="date" name="billing_date" value="{{ customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else '' }}" required>
+          </div>
+          <div class="modal-actions" style="display: flex; justify-content: space-between;">
+              <button type="submit" class="leet-btn" style="background:#ff7300; color:#fff;">Save</button>
+              <button type="button" class="leet-btn modal-close-btn" style="background:#181818; color:#fff;" onclick="closeBillingDateModal()">Cancel</button>
+          </div>
+      </form>
+  </div>
+</div>
+
 
 <!-- Toast code (for success messages) -->
 <style>
@@ -231,13 +248,24 @@ function handleStatusUpdate() {
     const currentStatus = "{{ customer.status|lower }}";
 
     if (currentStatus === 'not paid') {
-        openPaymentModal();
-    } else {
-        newStatus = currentStatus === 'inactive' ? 'active' : 'inactive';
+        openPaymentModal(); // Open payment modal for 'not paid' status
+    } else if (currentStatus === 'inactive') {
+        openBillingDateModal(); // Open billing date modal for 'inactive' status
+    } else if (currentStatus === 'active') {
+        // Confirm change to inactive
+        newStatus = 'inactive';
         const message = `Are you sure you want to update the customer status to ${newStatus}?`;
         document.getElementById('confirmationText').innerText = message;
         document.getElementById('confirmationModal').style.display = 'flex';
     }
+}
+
+function openBillingDateModal() {
+    document.getElementById('billingDateModal').style.display = 'flex';
+}
+
+function closeBillingDateModal() {
+    document.getElementById('billingDateModal').style.display = 'none';
 }
 
 function openPaymentModal() {
@@ -272,6 +300,7 @@ function updateCustomerStatus(status) {
         }
     });
 }
+
 </script>
 
 <script>

@@ -321,6 +321,25 @@ def edit_customer(cnic):
         edit_mode=True
     )
 
+
+@app.route('/update_billing_date/<cnic>', methods=['POST'])
+@login_required
+def update_billing_date(cnic):
+    customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+    new_billing_date = request.form.get('billing_date')
+    
+    if new_billing_date:
+        customer.billing_date = datetime.strptime(new_billing_date, '%Y-%m-%d')
+        customer.status = 'Active'  # Update status to Active
+        db.session.commit()
+        flash('Billing date updated and status set to active.', 'success')
+    else:
+        flash('Invalid billing date.', 'error')
+    
+    return redirect(url_for('manage_customer', cnic=cnic))
+
+
+
 @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
 @login_required
 def delete_customer(cnic):
