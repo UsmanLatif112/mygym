@@ -4,12 +4,15 @@
 <div class="add-customer-full-bg">
   <div class="add-customer-card">
     <!-- Conditionally hide back button if coming from QR or our domain -->
-    {% if not is_qr and not is_from_our_domain %}
-      <a href="{{ url_for('customers') }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
+    {% if back_url %}
+    <a href="{{ back_url }}" class="back-btn"><i class="fa fa-arrow-left"></i> Back</a>
     {% endif %}
     <h1>Add Customer</h1>
     <form method="POST" class="customer-form">
         {{ form.hidden_tag() }}
+        {% if is_from_our_domain %}
+        <input type="hidden" name="from_domain" value="1">
+        {% endif %}
 
         <div class="form-block">
             <label>Membership No:</label>

@@ -115,14 +115,20 @@ def check_cnic():
 def add_customer():
     form = CustomerForm()
     membership_no = generate_membership_no()
+    referrer = request.referrer 
+
 
     # Determine if this registration is from a QR code
     is_qr = request.args.get('mode') == 'qr'
 
-    # Check if the request comes from mygymlahore.com
-    referrer = request.referrer
-    is_from_our_domain = referrer and 'mygymlahore.com' in referrer and not referrer.startswith('https://app.')
-
+    if request.method == 'GET':
+        # Detect if came from main site (not app subdomain)
+        is_from_our_domain = referrer and 'mygymlahore.com' in referrer and not referrer.startswith('https://app.')
+    else:
+        # On POST, read from hidden field
+        is_from_our_domain = request.form.get('from_domain') == '1'
+    
+        
     # Fetch packages and trainers as before
     all_packages = Packages.query.all()
     individual_packages = [(str(p.id), p.package_name) for p in all_packages if p.package_type == 'Individual']
@@ -195,11 +201,23 @@ def add_customer():
         db.session.add(customer)
         db.session.commit()
         
-        if is_qr and is_from_our_domain:
+        if is_qr:
             return redirect(url_for('registration_success', mode='qr'))
+        elif is_from_our_domain:
+            return redirect(url_for('registration_success', is_from_our_domain=1))
+        elif referrer and 'app.mygymlahore.com/customers' in referrer:
+            flash("Customer added successfully!", "success")
+            return redirect(url_for('customers'))
         else:
             flash("Customer added successfully!", "success")
             return redirect(url_for('customers'))
+        
+    if is_qr:
+        back_url = None  # Hide back button in QR mode
+    elif is_from_our_domain:
+        back_url = 'https://mygymlahore.com'
+    else:
+        back_url = url_for('customers')
 
     if not form.admission_date.data:
         form.admission_date.data = datetime.now().date()
@@ -212,17 +230,20 @@ def add_customer():
         admission_date=form.admission_date.data,
         individual_packages=individual_packages,
         personal_packages=personal_packages,
-        is_qr=is_qr
+        is_qr=is_qr,
+        is_from_our_domain=is_from_our_domain,
+        back_url=back_url  # <--- Add this
     )
     
     
 @app.route('/registration_success')
 def registration_success():
     is_qr = request.args.get('mode') == 'qr'
-    is_from_our_domain = request.args.get('from_domain') == '1'
+    is_from_our_domain = request.args.get('is_from_our_domain') == '1'
+    redirect_to = None
     if is_from_our_domain:
-        return redirect('https://mygymlahore.com')
-    return render_template('registration_success.html', is_qr=is_qr)
+        redirect_to = 'https://mygymlahore.com'
+    return render_template('registration_success.html', is_qr=is_qr, redirect_to=redirect_to)
 
 @app.route('/customers/<cnic>')
 @login_required
