@@ -1,3 +1,12 @@
+<head>
+    {% block head %}
+        <title>My Gym | Login</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <!-- Your global CSS and meta tags here -->
+    {% endblock %}
+</head>
 {% extends "base.html" %}
 {% set hide_sidebar = True %}
 {% block content %}
@@ -10,10 +19,12 @@
             {{ form.username.label }}<br>
             {{ form.username(size=32, placeholder='Enter your username') }}
         </div>
-        <div>
-            {{ form.password.label }}<br>
-            {{ form.password(size=32, placeholder='Enter your password') }}
-        </div>
+        <div class="password-field-wrapper" style="position:relative;">
+    {{ form.password(size=32, placeholder='Enter your password', id='password') }}
+    <span id="togglePassword" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer;padding-bottom:6px;">
+        <i class="fa fa-eye" id="eyeIcon"></i>
+    </span>
+</div>
         <div>
             {{ form.submit(class_='leet-btn') }}
         </div>
@@ -54,6 +65,23 @@
 @keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
 </style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const passwordInput = document.getElementById('password');
+    const togglePassword = document.getElementById('togglePassword');
+    const eyeIcon = document.getElementById('eyeIcon');
+    togglePassword.addEventListener('click', function () {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        // Toggle icon
+        eyeIcon.classList.toggle('fa-eye');
+        eyeIcon.classList.toggle('fa-eye-slash');
+    });
+});
+</script>
 
 
 {% endblock %}

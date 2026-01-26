@@ -6,8 +6,8 @@ with app.app_context():
     db.create_all()  # Ensure tables exist
 
     # Change these values as you wish
-    username = 'admin'
-    password = 'admin123'
+    username = 'WaheedKhanMyGYM'
+    password = 'Waheed@shapeitup'
     role_id = 1
 
     if not User.query.filter_by(username=username).first():

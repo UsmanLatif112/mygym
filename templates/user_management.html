@@ -1,3 +1,12 @@
+<head>
+    {% block head %}
+        <title>My Gym | User Management</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <!-- Your global CSS and meta tags here -->
+    {% endblock %}
+</head>
 {% extends "base.html" %}
 {% block content %}
 <h1 class="page-title">User Management</h1>
@@ -33,7 +42,7 @@
           </button>
 
           <!-- Delete Button (hidden for admin user) -->
-          {% if u.username != 'admin' %}
+          {% if u.username != 'WaheedKhanMyGYM' %}
           <button class="leet-btn delete-btn" style="width:50px;height:34px; padding:6px 2px;" title="Delete User" onclick="openDeleteConfirmationModal('{{ url_for('delete_user', user_id=u.id) }}')">
             <i class="fa fa-trash"></i>
           </button>
