@@ -11,6 +11,7 @@ from flask import redirect, url_for
 from sqlalchemy import or_
 from flask import request, jsonify
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no, serialize_billing_history
 
 
@@ -109,6 +110,7 @@ def check_cnic():
     exists = Customer.query.filter_by(cnic=cnic).first() is not None
     return jsonify({'exists': exists})
 
+
 @app.route('/add_customer', methods=['GET', 'POST'])
 def add_customer():
     form = CustomerForm()
@@ -116,6 +118,10 @@ def add_customer():
 
     # Determine if this registration is from a QR code
     is_qr = request.args.get('mode') == 'qr'
+
+    # Check if the request comes from mygymlahore.com
+    referrer = request.referrer
+    is_from_our_domain = referrer and 'mygymlahore.com' in referrer and not referrer.startswith('https://app.')
 
     # Fetch packages and trainers as before
     all_packages = Packages.query.all()
@@ -188,7 +194,8 @@ def add_customer():
         )
         db.session.add(customer)
         db.session.commit()
-        if is_qr:
+        
+        if is_qr and is_from_our_domain:
             return redirect(url_for('registration_success', mode='qr'))
         else:
             flash("Customer added successfully!", "success")
@@ -207,6 +214,15 @@ def add_customer():
         personal_packages=personal_packages,
         is_qr=is_qr
     )
+    
+    
+@app.route('/registration_success')
+def registration_success():
+    is_qr = request.args.get('mode') == 'qr'
+    is_from_our_domain = request.args.get('from_domain') == '1'
+    if is_from_our_domain:
+        return redirect('https://mygymlahore.com')
+    return render_template('registration_success.html', is_qr=is_qr)
 
 @app.route('/customers/<cnic>')
 @login_required
@@ -348,67 +364,6 @@ def delete_customer(cnic):
     db.session.commit()
     flash("Customer deleted successfully!", "success")
     return redirect(url_for('customers'))
-
-# @app.route('/update_status/<cnic>', methods=['POST'])
-# @login_required
-# def update_status(cnic):
-#     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-#     package_obj = Packages.query.get(customer.package_id)
-
-#     package_price = int(package_obj.package_price) if package_obj and package_obj.package_price else 0
-#     registration_fees = int(request.form.get('registration_fees', 0))
-#     discount_amount = int(request.form.get('discount_amount', 0))  # Get discount amount
-#     total_amount = package_price + registration_fees - discount_amount
-#     paid_amount = int(request.form.get('paid_amount', 0))
-#     remaining_amount = total_amount - paid_amount
-#     next_billing_date = request.form.get('next_billing_date')
-#     payment_collected_by = request.form.get('collector_name')
-#     payment_method = request.form.get('payment_method', 'Unknown')
-#     transaction_id = request.form.get('transaction_id', None)
-
-#     if next_billing_date:
-#         customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
-#     customer.status = 'Active'
-#     customer.discount_amount = discount_amount  # Save discount amount
-
-#     remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).first()
-#     if not remaining_entry:
-#         remaining_entry = RemainingAmount(membership_no=customer.membership_no, remaining_amount=remaining_amount)
-#         db.session.add(remaining_entry)
-#     else:
-#         remaining_entry.remaining_amount = remaining_amount
-
-#     billing = Billing(
-#         customer_name=customer.name,
-#         membership_no=customer.membership_no,
-#         customer_cnic=customer.cnic,
-#         paid_to_be_amount=total_amount,
-#         paid_amount=paid_amount,
-#         remaining_amount=remaining_entry.remaining_amount,
-#         payment_collected_by=payment_collected_by,
-#         payment_method=payment_method,
-#         transaction_id=transaction_id if transaction_id else None,
-#         payment_date=datetime.utcnow()
-#     )
-#     db.session.add(billing)
-
-#     billing_history = BillingHistory(
-#         customer_cnic=customer.cnic,
-#         customer_name=customer.name,
-#         membership_no=customer.membership_no,
-#         amount_to_be_paid=total_amount,
-#         paid_amount=paid_amount,
-#         remaining_amount=remaining_entry.remaining_amount,
-#         payment_collected_by=payment_collected_by,
-#         payment_method=payment_method,
-#         transaction_id=transaction_id if transaction_id else None,
-#         payment_date=datetime.utcnow()
-#     )
-#     db.session.add(billing_history)
-
-#     db.session.commit()
-#     flash('Status and payment updated successfully.', 'success')
-#     return redirect(url_for('manage_customer', cnic=customer.cnic))
 
 @app.route('/update_status/<cnic>', methods=['POST'])
 @login_required
@@ -1043,12 +998,6 @@ def pay_salary(employee_id):
     flash('Salary record added!', 'success')
     return redirect(url_for('manage_employee', employee_id=employee.id))
 
-# registration success page =======
-
-@app.route('/registration_success')
-def registration_success():
-    is_qr = request.args.get('mode') == 'qr'
-    return render_template('registration_success.html', is_qr=is_qr)
 
 # user loader for login manager =======
 
