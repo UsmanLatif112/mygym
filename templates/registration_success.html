@@ -4,33 +4,260 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
         <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
-        <!-- Your global CSS and meta tags here -->
+        <style>
+            body {
+                background: #181818;
+            }
+            .success-emoji {
+                font-size: 5vw;
+                margin: 28px 0 0 0;
+                text-align: center;
+                filter: drop-shadow(0 4px 18px #ffb34799);
+            }
+            .success-heading {
+                color: #ffb347;
+                font-size: 2.2em;
+                font-weight: 800;
+                text-align: center;
+                margin: 0.2em 0 0.12em 0;
+                letter-spacing: 1px;
+            }
+            .success-subtitle {
+                color: #fff;
+                font-size: 1.13em;
+                font-weight: 500;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .pay-flex-card {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                align-items: stretch;
+                background: #232323;
+                border-radius: 18px;
+                box-shadow: 0 4px 28px #0007;
+                margin: 0 auto 30px auto;
+                max-width: 820px;
+                min-width: 0;
+                width: 100%;
+                padding: 0;
+                overflow: hidden;
+            }
+            .account-side, .qr-side {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+            .account-side {
+                flex: 1.15;
+                padding: 2.1em 1.8em 1.7em 2.3em;
+                background: #232323;
+                min-width: 220px;
+            }
+            .qr-side {
+                flex: 1.2;
+                align-items: center;
+                justify-content: center;
+                background: #181818;
+                padding: 2.2em 2.2em 1.7em 1.5em;
+                min-width: 200px;
+            }
+            .account-list {
+                width: 100%;
+                font-size: 1.09em;
+            }
+            .account-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 1.1em;
+                font-weight: 500;
+            }
+            .account-label {
+                color: #ffb347;
+                min-width: 120px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
+            }
+            .account-value {
+                color: #fff;
+                font-weight: 600;
+                margin-left: 7px;
+                word-break: break-all;
+                flex: 1;
+            }
+            .copy-btn {
+                background: none;
+                border: none;
+                color: #ffb347;
+                font-size: 1.13em;
+                cursor: pointer;
+                margin-left: 8px;
+                transition: color .15s;
+            }
+            .copy-btn:active { color: #ff7300; }
+            .qr-img {
+                background: #fff;
+                border-radius: 12px;
+                width: 240px;
+                max-width: 90vw;
+                box-shadow: 0 2px 14px #ff730040;
+                display: block;
+                margin-bottom: 13px;
+            }
+            .qr-label {
+                color: #ffb347;
+                font-size: 1.05em;
+                font-weight: 700;
+                letter-spacing: 1px;
+                text-align: center;
+                margin-top: 0.7em;
+            }
+            .admin-contact-row {
+                margin: 1.5em 0 0.3em 0;
+                text-align: center;
+            }
+            .contact-label {
+                color: #fff;
+                font-size: 1.08em;
+                margin-bottom: 0.5em;
+            }
+            .contact-wrap {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.6em;
+            }
+            .contact-number {
+                color: #ff7300;
+                font-weight: 700;
+                font-size: 1.13em;
+                background: #232323;
+                border-radius: 8px;
+                padding: 4px 12px;
+                margin-right: 4px;
+                letter-spacing: 1px;
+            }
+            .whatsapp-link {
+                color: #25d366;
+                font-size: 1.6em;
+                margin-left: 10px;
+                vertical-align: middle;
+                text-decoration: none;
+                transition: color .15s;
+            }
+            .whatsapp-link:hover { color: #ffb347; }
+            .back-btn-custom {
+                margin: 20px auto 0 auto;
+                background: linear-gradient(90deg, #ff7300, #ffb347 70%);
+                color: #181818;
+                font-size: 1.17em;
+                padding: 10px 44px;
+                border-radius: 8px;
+                border: none;
+                display: block;
+                font-weight: 700;
+                cursor: pointer;
+                letter-spacing: 1px;
+                box-shadow: 0 2px 10px #ffb34720;
+                transition: background .20s, color .20s;
+            }
+            .back-btn-custom:hover {
+                background: #232323;
+                color: #ffb347;
+                border: 1px solid #ffb347;
+            }
+            @media (max-width: 850px) {
+                .pay-flex-card { flex-direction: column; padding: 0; }
+                .account-side, .qr-side { padding: 2em 1.2em 1.2em 1.2em; align-items: flex-start; }
+                .qr-side { align-items: center; }
+                .qr-img { width: 180px; }
+            }
+            @media (max-width: 600px) {
+                .pay-flex-card { max-width: 99vw; }
+                .account-side, .qr-side { padding: 1.5em 0.5em 1em 0.5em; }
+                .qr-img { width: 140px; }
+                .success-emoji { font-size: 4em; }
+                .admin-contact-row { margin-top: 1.5em;}
+            }
+        </style>
     {% endblock %}
 </head>
 
-<div style="background:#000; position:fixed;top:0;left:0;width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;">
-    <div style="font-size:6em;margin-bottom:16px;">🎉</div>
-    <div style="color:#ffb347;font-size:2.2em;font-weight:700;text-align:center;">
-        Welcome on board!
+<body>
+    <div class="success-emoji">🎉</div>
+    <div class="success-heading">Welcome on board!</div>
+    <div class="success-subtitle">
+        Your registration is complete.<br>
+        Thank you for joining My Gym!
     </div>
-    <div style="margin-top:20px;color:#fff;font-size:1.1em;text-align:center;">
-        Your registration is complete.<br>Thank you for joining My Gym!
-    </div>
-</div>
 
-{% if not is_qr %}
+    <div class="pay-flex-card">
+        <div class="account-side">
+            <div style="color:#ffb347;font-size:1.18em;font-weight:700;margin-bottom:1.1em;letter-spacing:0.5px;">
+                Payment Details
+            </div>
+            <div class="account-list">
+                <div class="account-item">
+                    <div class="account-label">Account Title:</div>
+                    <div class="account-value">MY GYM</div>
+                </div>
+                <div class="account-item">
+                    <div class="account-label">Bank Name:</div>
+                    <div class="account-value">Faysal Bank</div>
+                </div>
+                <div class="account-item">
+                    <div class="account-label">Account Number:</div>
+                    <div class="account-value" id="accountNo">3202301000004360</div>
+                    <button class="copy-btn" onclick="copyToClipboard('accountNo', this)" title="Copy Account Number" data-copy-btn>
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="qr-side">
+            <img class="qr-img" src="{{ url_for('static', filename='bank_qr.jpeg') }}" alt="Bank QR Code">
+            <div class="qr-label">MY GYM - 4360</div>
+        </div>
+    </div>
+
+    <div class="admin-contact-row">
+        <div class="contact-label">
+            Please inform admin and share screenshot on this number
+        </div>
+        <div class="contact-wrap">
+            <span class="contact-number" id="adminPhone">+923344441455</span>
+            <button class="copy-btn" onclick="copyToClipboard('adminPhone', this)" title="Copy Phone Number" data-copy-btn>
+                <i class="fa-regular fa-copy"></i>
+            </button>
+            <a class="whatsapp-link" href="https://wa.me/923344441455" target="_blank" title="WhatsApp">
+                <i class="fab fa-whatsapp"></i>
+            </a>
+        </div>
+    </div>
+
+    {% if not is_qr and redirect_to %}
+        <button class="back-btn-custom" onclick="window.location.href='{{ redirect_to }}'">
+            Back
+        </button>
+    {% endif %}
+
     <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        {% if redirect_to %}
-        setTimeout(function() {
-            window.location.href = "{{ redirect_to }}";
-        }, 3000); // Redirect after 3 seconds
-        {% else %}
-        setTimeout(function() {
-            window.location.href = "{{ url_for('customers') }}";
-        }, 3000); // Redirect after 3 seconds
-        {% endif %}
-      });
+    function copyToClipboard(elementId, btn) {
+        var text = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(text).then(function() {
+            // Change icon to tick
+            const icon = btn.querySelector('i');
+            icon.classList.remove('fa-copy', 'fa-regular');
+            icon.classList.add('fa-solid', 'fa-check');
+            icon.style.color = '#24e07a';
+            // Restore icon after delay
+            setTimeout(function() {
+                icon.classList.remove('fa-solid', 'fa-check');
+                icon.classList.add('fa-regular', 'fa-copy');
+                icon.style.color = '';
+            }, 1500);
+        });
+    }
     </script>
-{% endif %}
-
+</body>

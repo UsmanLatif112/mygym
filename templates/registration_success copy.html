@@ -1,0 +1,36 @@
+<head>
+    {% block head %}
+        <title>My Gym | Registration Success</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <!-- Your global CSS and meta tags here -->
+    {% endblock %}
+</head>
+
+<div style="background:#000; position:fixed;top:0;left:0;width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;">
+    <div style="font-size:6em;margin-bottom:16px;">🎉</div>
+    <div style="color:#ffb347;font-size:2.2em;font-weight:700;text-align:center;">
+        Welcome on board!
+    </div>
+    <div style="margin-top:20px;color:#fff;font-size:1.1em;text-align:center;">
+        Your registration is complete.<br>Thank you for joining My Gym!
+    </div>
+</div>
+
+{% if not is_qr %}
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        {% if redirect_to %}
+        setTimeout(function() {
+            window.location.href = "{{ redirect_to }}";
+        }, 3000); // Redirect after 3 seconds
+        {% else %}
+        setTimeout(function() {
+            window.location.href = "{{ url_for('customers') }}";
+        }, 3000); // Redirect after 3 seconds
+        {% endif %}
+      });
+    </script>
+{% endif %}
+
