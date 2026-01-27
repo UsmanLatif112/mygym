@@ -18,7 +18,8 @@ from helper import parse_float, get_billing_date, parse_tagify, get_customer_typ
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_Waheedadmin:Waheed%40shapeitup@148.163.100.132:3306/mygymlahore_mygymbarkatmarket'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -463,7 +464,10 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
+        print("youusername=", user)
+        print("youusername=", user.check_password(form.password.data))
+        if user and not user.check_password(form.password.data):
+            
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
