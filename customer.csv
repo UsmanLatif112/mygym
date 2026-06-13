@@ -1,0 +1,2 @@
+id,membership_no,admission_date,type,package_id,status,billing_date,name,email,father_or_husband,cnic,gender,marital_status,blood_group,dob,height,weight,waist,profession,nationality,address,phone,emergency_contact,package,personal_training_time,trainer,bmi_test,bmi_value,illnesses,illness_other,join_reasons,terms_accepted,thumb_id,created_at,updated_at,discount_amount
+1,202601-001,7/3/2020,Individual,1,Not Paid,8/3/2026,Muhammad farooq aqil,muhammadfarooqaqil@gmail.com,Muhammad aqil,,male,Single,,,,,,,,,3008445536,3008445536,,,,No,,,,General Fitne,1,,,,1500
