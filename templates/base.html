@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
-    <title>My Gym | Shape it up</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <title>Alpha Fitness Gym | Shape it up</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
@@ -12,7 +12,7 @@
         <img src="{{ url_for('static', filename='logo.png') }}" class="logo-center"/>
         <div class="sidebar-user">
             {% if current_user.is_authenticated %}
-                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;">Welcome</div>
+                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;"></div>
                 {% if current_user.username|length > 12 %}
                     <div style="font-size: 1.2em;color: #ffb347;margin-top: 8px;word-break: break-word;text-align: center;"
                         title="{{ current_user.username|capitalize }}">
@@ -24,7 +24,7 @@
                     </div>
                 {% endif %}
             {% else %}
-                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;">Welcome to My Gym</div>
+                <div style="font-size: 1.5em; color: #ff7300; font-weight: 600;">Welcome to Alpha Fitness Gym</div>
             {% endif %}
         </div>
         <div class="sidebar-nav-scroll scroll-hidden" style="height: 450px;">

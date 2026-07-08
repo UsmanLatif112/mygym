@@ -4,22 +4,24 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from models import BillingHistory, db, User, Customer, Billing, Packages,Employee, Attendance
 from models import db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
 from forms import LoginForm, CustomerForm, EmployeeForm
-from datetime import datetime
+from datetime import date, datetime
 import json
 from dateutil.relativedelta import relativedelta
 from flask import redirect, url_for
 from sqlalchemy import or_
 from flask import request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,date
 from urllib.parse import urlparse
 from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no, serialize_billing_history
+from utils import paginate_list
 
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_Waheedadmin:Waheed%401122@148.163.100.132:3306/mygymlahore_mygymbarkatmarket'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_Waheedadmin:Waheed%401122@148.163.100.132:3306/mygymlahore_mygymbarkatmarket'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_admin_alphafitnessgym:Waqas%400336@148.163.100.132:3306/mygymlahore_alphafitnessgym'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -85,6 +87,8 @@ def customers():
                 Customer.phone.ilike(f"%{q}%")
             )
         )
+        
+    
     customers_list = query.all()
     # Fetch all packages and create a dict for quick lookup
     packages = Packages.query.all()
@@ -93,7 +97,27 @@ def customers():
     messages = get_flashed_messages(with_categories=True)
     print("Flashed messages:", messages)
     # Pass packages_dict to the template
-    return render_template("customers.html", customers=customers_list, packages_dict=packages_dict)
+    today = date.today()
+    
+    def sort_key(c):
+        days_until = (c.billing_date - today).days
+        is_active = c.status and c.status.lower() == 'active'
+        is_due_soon = is_active and 0 <= days_until <= 2
+        # Group 0: Active + billing within next 2 days -> top, soonest first
+        # Group 1: everyone else -> sorted by billing date
+        return (0 if is_due_soon else 1, c.billing_date)
+    customers = sorted(customers_list, key=sort_key)
+    pagination = paginate_list(customers, default_per_page=20)
+    return render_template(
+        "customers.html",
+        customers=pagination["items"],       # <-- was 'customers' (the full list), now the paginated slice
+        packages_dict=packages_dict,
+        today=today,
+        page=pagination["page"],
+        total_pages=pagination["total_pages"],
+        total=pagination["total"],
+        per_page=pagination["per_page"]
+    )
 
 @app.route('/update_customer_status/<int:customer_id>', methods=['POST'])
 def update_customer_status(customer_id):
@@ -124,7 +148,7 @@ def add_customer():
 
     if request.method == 'GET':
         # Detect if came from main site (not app subdomain)
-        is_from_our_domain = referrer and 'mygymlahore.com' in referrer and not referrer.startswith('https://app.')
+        is_from_our_domain = referrer and 'usmanlateef.com' in referrer and not referrer.startswith('https://app.')
     else:
         # On POST, read from hidden field
         is_from_our_domain = request.form.get('from_domain') == '1'
@@ -206,7 +230,7 @@ def add_customer():
             return redirect(url_for('registration_success', mode='qr'))
         elif is_from_our_domain:
             return redirect(url_for('registration_success', is_from_our_domain=1))
-        elif referrer and 'app.mygymlahore.com/customers' in referrer:
+        elif referrer and 'app.usmanlateef.com/customers' in referrer:
             flash("Customer added successfully!", "success")
             return redirect(url_for('customers'))
         else:
@@ -216,7 +240,7 @@ def add_customer():
     if is_qr:
         back_url = None  # Hide back button in QR mode
     elif is_from_our_domain:
-        back_url = 'https://mygymlahore.com'
+        back_url = 'https://usmanlateef.com'
     else:
         back_url = url_for('customers')
 
@@ -243,7 +267,7 @@ def registration_success():
     is_from_our_domain = request.args.get('is_from_our_domain') == '1'
     redirect_to = None
     if is_from_our_domain:
-        redirect_to = 'https://mygymlahore.com'
+        redirect_to = 'https://usmanlateef.com'
     return render_template('registration_success.html', is_qr=is_qr, redirect_to=redirect_to)
 
 @app.route('/customers/<cnic>')

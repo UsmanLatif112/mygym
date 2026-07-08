@@ -1,9 +1,9 @@
 <head>
     {% block head %}
-        <title>My Gym | Login</title>
+        <title>Alpha Fitness Gym | Login</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
         <!-- Your global CSS and meta tags here -->
     {% endblock %}
 </head>
@@ -12,7 +12,7 @@
 {% block content %}
 <div class="login-container">
     <img src="{{ url_for('static', filename='logo.png') }}" class="logo-center" style="max-width:90px; margin-bottom:22px;"/>
-    <h2>Welcome to My Gym</h2>
+    <h2 style="text-wrap: auto;width: 225px;text-align: center;">Welcome to Alpha Fitness Gym</h2>
     <form method="POST">
         {{ form.hidden_tag() }}
         <div>

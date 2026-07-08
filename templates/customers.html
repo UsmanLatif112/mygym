@@ -1,9 +1,9 @@
-<head>
+ <head>
     {% block head %}
-        <title>My Gym | Customers</title>
+        <title>Alpha Fitness Gym | Customers</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
         <!-- Your global CSS and meta tags here -->
     {% endblock %}
 </head>
@@ -28,9 +28,6 @@
     </button>
 </div>
 
-
-
-
 <div class="customers-table-wrap">
     <table class="customers-table">
         <thead>
@@ -46,7 +43,10 @@
         </thead>
         <tbody class=customers-table-body>
             {% for c in customers %}
-            <tr>
+            {% set days_until = (c.billing_date - today).days %}
+            {% set is_active = c.status and c.status.lower() == 'active' %}
+            {% set due_soon = is_active and 0 <= days_until <= 2 %}
+            <tr{% if due_soon %} class="row-due-soon"{% endif %}>
                 <td>
                     {% if c.name and c.name|length > 20 %}
                         <span title="{{ c.name }}">{{ c.name[:20] }}&hellip;</span>
@@ -58,12 +58,27 @@
                 <td>
                     {% set pkg = packages_dict.get(c.package_id) %}
                     {{ pkg.package_type if pkg else '' }}
-                    </td>
-                    <td>
+                </td>
+                <td>
                     {% set pkg = packages_dict.get(c.package_id) %}
                     {{ pkg.package_name if pkg else '' }}
-                    </td>
-                <td>{{ c.billing_date.strftime('%Y-%m-%d') }}</td> 
+                </td>
+                <td>
+                    {% if c.billing_date %}
+                        {{ c.billing_date.strftime('%Y-%m-%d') }}
+                        {% set days_left = (c.billing_date - today).days %}
+                        {% if days_left > 0 %}
+                            <br><span class="days-pending">{{ days_left }} day{{ 's' if days_left != 1 }} left</span>
+                        {% elif days_left == 0 %}
+                            <br><span class="days-pending due-today">Due today</span>
+                        {% else %}
+                            <br><span class="days-pending overdue">Overdue by {{ -days_left }} day{{ 's' if -days_left != 1 }}</span>
+                        {% endif %}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                    
                 <td>
                     {% if c.status and c.status.lower() == 'active' %}
                         <span class="status-badge status-active">{{ c.status }}</span>
@@ -77,15 +92,30 @@
                     <a href="{{ url_for('manage_customer', cnic=c.cnic) }}" class="manage-btn">Manage</a>
                 </td>
             </tr>
-             {% else %}
+            {% else %}
             <tr>
-                <td colspan="5" style="text-align:center; padding:20px;">No customer found.</td>
+                <td colspan="7" style="text-align:center; padding:20px;">No customer found.</td>
             </tr>
-            
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+{% if total_pages and total_pages > 1 %}
+<div class="pagination-wrap" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:24px;">
+    <a href="{{ url_for(request.endpoint, q=request.args.get('q',''), page=page-1) }}"
+       class="page-btn {% if page <= 1 %}disabled{% endif %}">
+        <i class="fa fa-chevron-left"></i> Prev
+    </a>
+
+    <span style="color:#ff7300; font-weight:600;">Page {{ page }} of {{ total_pages }}</span>
+
+    <a href="{{ url_for(request.endpoint, q=request.args.get('q',''), page=page+1) }}"
+       class="page-btn {% if page >= total_pages %}disabled{% endif %}">
+        Next <i class="fa fa-chevron-right"></i>
+    </a>
+</div>
+{% endif %}
 
 <style>
 .toast-success {
@@ -107,6 +137,33 @@
 }
 @keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+
+.row-due-soon {
+    background-color: #fff4e5;
+}
+.due-soon-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #fff;
+    background: #ff7300;
+    border-radius: 4px;
+}
+.page-btn {
+    padding: 8px 18px;
+    background: #ff7300;
+    color: #fff;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+}
+.page-btn.disabled {
+    background: #444;
+    pointer-events: none;
+    opacity: 0.6;
+}
 </style>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -125,13 +182,4 @@
   {% endif %}
 {% endwith %}
 
-<script>
-document.getElementById('customers-live-search').addEventListener('input', function() {
-    // Submit the form automatically whenever the input changes
-    this.form.submit();
-});
-</script>
-
 {% endblock %}
-
-

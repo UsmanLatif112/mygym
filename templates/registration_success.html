@@ -1,9 +1,9 @@
 <head>
     {% block head %}
-        <title>My Gym | Registration Success</title>
+        <title>Alpha Fitness Gym | Registration Success</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo.png') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
         <style>
             body {
                 background: #181818;
@@ -189,7 +189,7 @@
     <div class="success-heading">Welcome on board!</div>
     <div class="success-subtitle">
         Your registration is complete.<br>
-        Thank you for joining My Gym!
+        Thank you for joining Alpha Fitness Gym!
     </div>
 
     <div class="pay-flex-card">
@@ -200,7 +200,7 @@
             <div class="account-list">
                 <div class="account-item">
                     <div class="account-label">Account Title:</div>
-                    <div class="account-value">MY GYM</div>
+                    <div class="account-value">Alpha Fitness Gym</div>
                 </div>
                 <div class="account-item">
                     <div class="account-label">Bank Name:</div>
@@ -217,7 +217,7 @@
         </div>
         <div class="qr-side">
             <img class="qr-img" src="{{ url_for('static', filename='bank_qr.jpeg') }}" alt="Bank QR Code">
-            <div class="qr-label">MY GYM - 4360</div>
+            <div class="qr-label">Alpha Fitness Gym - 4360</div>
         </div>
     </div>
 
@@ -226,11 +226,11 @@
             Please inform admin and share screenshot on this number
         </div>
         <div class="contact-wrap">
-            <span class="contact-number" id="adminPhone">+923344441455</span>
+            <span class="contact-number" id="adminPhone">+92349561651</span>
             <button class="copy-btn" onclick="copyToClipboard('adminPhone', this)" title="Copy Phone Number" data-copy-btn>
                 <i class="fa-regular fa-copy"></i>
             </button>
-            <a class="whatsapp-link" href="https://wa.me/923344441455" target="_blank" title="WhatsApp">
+            <a class="whatsapp-link" href="https://wa.me/92349561651" target="_blank" title="WhatsApp">
                 <i class="fab fa-whatsapp"></i>
             </a>
         </div>
