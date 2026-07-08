@@ -70,3 +70,4 @@ websocket-client
 Werkzeug
 wsproto
 WTForms
+pyzk

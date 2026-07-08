@@ -1,22 +1,26 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import BillingHistory, db, User, Customer, Billing, Packages,Employee, Attendance
-from models import db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
+from models import BillingHistory, db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
 from forms import LoginForm, CustomerForm, EmployeeForm
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
+import os
+import logging
 import json
+import time
+import threading
+import requests
+from dotenv import load_dotenv
+from math import ceil
 from dateutil.relativedelta import relativedelta
-from flask import redirect, url_for
-from sqlalchemy import or_
-from flask import request, jsonify
-from datetime import datetime, timedelta,date
+from sqlalchemy import or_, text
 from urllib.parse import urlparse
 from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no, serialize_billing_history
 from utils import paginate_list
+from attendance_utils import parse_check_in_at, should_skip_duplicate
 
 
-
+load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
@@ -27,6 +31,348 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+INGEST_SECRET = os.getenv("ATTENDANCE_INGEST_KEY", "")
+ATTENDANCE_DEDUP_SECONDS = int(os.getenv("ATTENDANCE_DEDUP_SECONDS", "60"))
+ATTENDANCE_INACTIVE_DAYS = int(os.getenv("ATTENDANCE_INACTIVE_DAYS", "30"))
+ATTENDANCE_CRON_ENABLED = os.getenv("ATTENDANCE_CRON_ENABLED", "1") == "1"
+ATTENDANCE_CRON_INTERVAL_SECONDS = int(os.getenv("ATTENDANCE_CRON_INTERVAL_SECONDS", "300"))
+ATTENDANCE_PAGE_AUTO_SYNC_SECONDS = int(os.getenv("ATTENDANCE_PAGE_AUTO_SYNC_SECONDS", "5"))
+ATTENDANCE_FETCH_URL = os.getenv("ATTENDANCE_FETCH_URL", "").strip()
+ATTENDANCE_FETCH_API_KEY = os.getenv("ATTENDANCE_FETCH_API_KEY", "").strip()
+ZK_IP = os.getenv("ZK_IP", "").strip()
+ZK_PORT = int(os.getenv("ZK_PORT", "4370"))
+ZK_TIMEOUT = int(os.getenv("ZK_TIMEOUT", "10"))
+ZK_PASSWORD = int(os.getenv("ZK_PASSWORD", "0"))
+app.logger.setLevel(logging.INFO)
+
+
+def ensure_attendance_schema():
+    """Best-effort schema patch for deployments without migration tooling."""
+    with db.engine.begin() as conn:
+        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM attendance"))}
+
+        if "customer_id" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN customer_id INT NULL"))
+        if "thumb_id" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN thumb_id VARCHAR(100) NULL"))
+        if "check_in_at" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN check_in_at DATETIME NULL"))
+        if "source" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN source VARCHAR(50) NULL"))
+        if "device_sn" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN device_sn VARCHAR(100) NULL"))
+        if "raw_uid" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN raw_uid VARCHAR(100) NULL"))
+        if "event_id" not in existing:
+            conn.execute(text("ALTER TABLE attendance ADD COLUMN event_id VARCHAR(120) NULL"))
+
+        index_statements = [
+            "CREATE INDEX idx_attendance_thumb_id ON attendance (thumb_id)",
+            "CREATE INDEX idx_attendance_check_in_at ON attendance (check_in_at)",
+            "CREATE INDEX idx_attendance_customer_id ON attendance (customer_id)",
+            "CREATE INDEX idx_attendance_event_id ON attendance (event_id)",
+        ]
+        for statement in index_statements:
+            try:
+                conn.execute(text(statement))
+            except Exception:
+                # Index likely already exists; this schema sync is intentionally best-effort.
+                pass
+
+
+def ensure_billing_history_schema():
+    """Best-effort schema patch for billing_history table."""
+    with db.engine.begin() as conn:
+        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM billing_history"))}
+
+        if "customer_cnic" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN customer_cnic VARCHAR(20) NULL"))
+        if "customer_name" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN customer_name VARCHAR(120) NULL"))
+        if "membership_no" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN membership_no VARCHAR(20) NULL"))
+        if "amount_to_be_paid" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN amount_to_be_paid INT NULL"))
+        if "paid_amount" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN paid_amount INT NULL"))
+        if "remaining_amount" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN remaining_amount INT NULL"))
+        if "payment_collected_by" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_collected_by VARCHAR(100) NULL"))
+        if "payment_date" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_date DATETIME NULL"))
+        if "payment_method" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_method VARCHAR(50) NULL"))
+        if "transaction_id" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN transaction_id VARCHAR(50) NULL"))
+        if "created_at" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN created_at DATETIME NULL"))
+        if "updated_at" not in existing:
+            conn.execute(text("ALTER TABLE billing_history ADD COLUMN updated_at DATETIME NULL"))
+
+
+def ensure_salary_history_schema():
+    """Best-effort schema patch for salary_history table."""
+    with db.engine.begin() as conn:
+        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM salary_history"))}
+
+        if "employee_id" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN employee_id INT NULL"))
+        if "employee_name" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN employee_name VARCHAR(120) NULL"))
+        if "salary_amount" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN salary_amount INT NULL"))
+        if "payment_type" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN payment_type VARCHAR(20) NULL"))
+        if "payment_method" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN payment_method VARCHAR(50) NULL"))
+        if "transaction_id" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN transaction_id VARCHAR(100) NULL"))
+        if "transaction_date" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN transaction_date DATETIME NULL"))
+        if "created_at" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN created_at DATETIME NULL"))
+        if "updated_at" not in existing:
+            conn.execute(text("ALTER TABLE salary_history ADD COLUMN updated_at DATETIME NULL"))
+
+
+def extract_attendance_events(payload):
+    """Normalize attendance payload into an events list."""
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        events = payload.get("events")
+        if events is not None:
+            return events
+        if payload.get("thumb_id"):
+            return [payload]
+    return []
+
+
+def thumb_id_has_attendance_on_day(thumb_id, attendance_day):
+    """Return True if thumb_id already has attendance on the given date."""
+    if not thumb_id or not attendance_day:
+        return False
+
+    return Attendance.query.filter(
+        Attendance.thumb_id == thumb_id,
+        db.func.date(Attendance.check_in_at) == attendance_day,
+    ).first() is not None
+
+
+def process_attendance_events(
+    events,
+    source_fallback="zkteco_bridge",
+    limit_to_today=False,
+    one_per_day=True,
+):
+    """Insert attendance events and return ingestion summary."""
+    if not isinstance(events, list) or not events:
+        return {
+            "success": False,
+            "inserted": 0,
+            "duplicates": 0,
+            "invalid": 0,
+            "unknown_ids": [],
+            "error": "invalid_payload",
+        }
+
+    normalized_events = []
+    for event in events:
+        check_in_at = parse_check_in_at(event.get("check_in_at"))
+        if not check_in_at:
+            continue
+        if limit_to_today and check_in_at.date() != date.today():
+            continue
+        normalized_events.append((event, check_in_at))
+
+    if one_per_day:
+        normalized_events.sort(key=lambda item: item[1], reverse=True)
+
+    inserted = 0
+    duplicates = 0
+    unknown_ids = []
+    invalid = 0
+    batch_seen_days = set()
+
+    for event, check_in_at in normalized_events:
+        thumb_id = str(event.get("thumb_id", "")).strip()
+        event_id = str(event.get("event_id", "")).strip() or None
+        attendance_day = check_in_at.date()
+
+        if not thumb_id:
+            invalid += 1
+            continue
+
+        if one_per_day:
+            day_key = (thumb_id, attendance_day)
+            if day_key in batch_seen_days:
+                duplicates += 1
+                continue
+            if thumb_id_has_attendance_on_day(thumb_id, attendance_day):
+                duplicates += 1
+                continue
+            batch_seen_days.add(day_key)
+
+        customer = Customer.query.filter_by(thumb_id=thumb_id).first()
+        if not customer:
+            unknown_ids.append(thumb_id)
+            continue
+
+        if event_id and Attendance.query.filter_by(event_id=event_id).first():
+            duplicates += 1
+            continue
+
+        if not one_per_day:
+            last_log = Attendance.query.filter_by(customer_id=customer.id).order_by(Attendance.check_in_at.desc()).first()
+            if should_skip_duplicate(last_log, check_in_at, ATTENDANCE_DEDUP_SECONDS):
+                duplicates += 1
+                continue
+
+        attendance = Attendance(
+            customer_id=customer.id,
+            thumb_id=thumb_id,
+            check_in_at=check_in_at,
+            source=str(event.get("source", source_fallback)).strip() or source_fallback,
+            device_sn=str(event.get("device_sn", "")).strip() or None,
+            raw_uid=str(event.get("raw_uid", "")).strip() or None,
+            event_id=event_id
+        )
+        db.session.add(attendance)
+        inserted += 1
+
+    db.session.commit()
+    if unknown_ids:
+        app.logger.warning("Unknown thumb IDs in attendance ingest: %s", ",".join(sorted(set(unknown_ids))))
+
+    return {
+        "success": True,
+        "inserted": inserted,
+        "duplicates": duplicates,
+        "invalid": invalid,
+        "unknown_ids": sorted(set(unknown_ids)),
+    }
+
+
+def fetch_attendance_events_from_url():
+    """Fetch attendance payload from remote HTTP endpoint."""
+    if not ATTENDANCE_FETCH_URL:
+        return []
+
+    headers = {}
+    if ATTENDANCE_FETCH_API_KEY:
+        headers["X-API-KEY"] = ATTENDANCE_FETCH_API_KEY
+
+    response = requests.get(ATTENDANCE_FETCH_URL, headers=headers, timeout=20)
+    response.raise_for_status()
+    payload = response.json()
+    events = extract_attendance_events(payload)
+    return events if isinstance(events, list) else []
+
+
+def fetch_attendance_events_from_zkteco():
+    """Fetch attendance directly from ZKTeco device using pyzk."""
+    if not ZK_IP:
+        return []
+
+    from zkteco_fetcher import fetch_zkteco_attendance_events
+
+    return fetch_zkteco_attendance_events(
+        ip=ZK_IP,
+        port=ZK_PORT,
+        timeout=ZK_TIMEOUT,
+        password=ZK_PASSWORD,
+    )
+
+
+def attendance_source_configured():
+    return bool(ZK_IP) or bool(ATTENDANCE_FETCH_URL)
+
+
+def fetch_attendance_events_for_cron():
+    """Fetch attendance from ZKTeco device first, otherwise HTTP URL."""
+    if ZK_IP:
+        return fetch_attendance_events_from_zkteco()
+    return fetch_attendance_events_from_url()
+
+
+def sync_attendance_now(source_fallback="manual_sync"):
+    """Fetch attendance once and ingest into attendance table."""
+    if not attendance_source_configured():
+        return {
+            "success": False,
+            "inserted": 0,
+            "duplicates": 0,
+            "invalid": 0,
+            "unknown_ids": [],
+            "error": "fetch_not_configured",
+        }
+
+    events = fetch_attendance_events_for_cron()
+    if not events:
+        return {
+            "success": True,
+            "inserted": 0,
+            "duplicates": 0,
+            "invalid": 0,
+            "unknown_ids": [],
+            "message": "no_events",
+        }
+
+    return process_attendance_events(
+        events,
+        source_fallback=source_fallback,
+        limit_to_today=True,
+        one_per_day=True,
+    )
+
+
+def attendance_cron_loop():
+    """Background polling loop to fetch and ingest attendance."""
+    while True:
+        try:
+            with app.app_context():
+                result = sync_attendance_now(source_fallback="cron_pull")
+                if result.get("success") and (
+                    result.get("inserted")
+                    or result.get("duplicates")
+                    or result.get("invalid")
+                    or result.get("unknown_ids")
+                ):
+                    app.logger.info(
+                        "Attendance cron sync: inserted=%s duplicates=%s invalid=%s unknown=%s",
+                        result["inserted"],
+                        result["duplicates"],
+                        result["invalid"],
+                        len(result["unknown_ids"])
+                    )
+        except Exception as exc:
+            app.logger.warning("Attendance cron sync failed: %s", exc)
+
+        time.sleep(max(30, ATTENDANCE_CRON_INTERVAL_SECONDS))
+
+
+def start_attendance_cronjob():
+    """Start daemon cron-like worker thread for attendance sync."""
+    if not ATTENDANCE_CRON_ENABLED:
+        app.logger.info("Attendance cron disabled by config.")
+        return
+    if not attendance_source_configured():
+        app.logger.info("Attendance cron enabled but ZK_IP / ATTENDANCE_FETCH_URL is not configured; skipping startup.")
+        return
+    if app.config.get("_attendance_cron_started"):
+        return
+
+    worker = threading.Thread(target=attendance_cron_loop, name="attendance-cron-worker", daemon=True)
+    worker.start()
+    app.config["_attendance_cron_started"] = True
+    source = f"zkteco://{ZK_IP}:{ZK_PORT}" if ZK_IP else ATTENDANCE_FETCH_URL
+    app.logger.info(
+        "Attendance cron started. interval=%ss source=%s",
+        max(30, ATTENDANCE_CRON_INTERVAL_SECONDS),
+        source
+    )
 
 
 # Flash route =====================================
@@ -118,6 +464,205 @@ def customers():
         total=pagination["total"],
         per_page=pagination["per_page"]
     )
+
+
+def dedupe_attendance_by_membership(rows):
+    """Keep only the latest attendance row per membership number."""
+    seen = set()
+    unique_rows = []
+    for log, customer in rows:
+        if customer and customer.membership_no:
+            key = customer.membership_no
+        else:
+            key = f"thumb:{log.thumb_id or log.id}"
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_rows.append((log, customer))
+    return unique_rows
+
+
+def build_attendance_query(q):
+    query = db.session.query(Attendance, Customer).outerjoin(
+        Customer, Attendance.thumb_id == Customer.thumb_id
+    )
+
+    if q:
+        query = query.filter(
+            db.or_(
+                Customer.name.ilike(f"%{q}%"),
+                Customer.membership_no.ilike(f"%{q}%"),
+                Customer.cnic.ilike(f"%{q}%"),
+                Customer.phone.ilike(f"%{q}%"),
+                Attendance.thumb_id.ilike(f"%{q}%")
+            )
+        )
+
+    return query.order_by(Attendance.check_in_at.desc())
+
+
+def serialize_attendance_row(log, customer, today):
+    pending_class = None
+    pending_text = "N/A"
+
+    if customer and customer.billing_date:
+        days_left = (customer.billing_date - today).days
+        if days_left < 0:
+            pending_class = "pending-overdue"
+            pending_text = f"Overdue by {-days_left} day{'s' if -days_left != 1 else ''}"
+        elif days_left <= 2:
+            pending_class = "pending-due-soon"
+            pending_text = "Due today" if days_left == 0 else f"{days_left} day{'s' if days_left != 1 else ''} left"
+        else:
+            pending_class = "pending-ok"
+            pending_text = f"{days_left} day{'s' if days_left != 1 else ''} left"
+
+    return {
+        "member_name": customer.name if customer else "Unknown (thumb not mapped)",
+        "membership_no": customer.membership_no if customer else "N/A",
+        "thumb_id": log.thumb_id or "N/A",
+        "check_in_at": log.check_in_at.strftime("%Y-%m-%d %H:%M:%S") if log.check_in_at else "N/A",
+        "pending_class": pending_class,
+        "pending_text": pending_text,
+    }
+
+
+def get_attendance_page_data(q="", page=1, per_page=20):
+    today = date.today()
+    logs = build_attendance_query(q).all()
+    logs = dedupe_attendance_by_membership(logs)
+
+    total = len(logs)
+    total_pages = max(1, ceil(total / per_page))
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    page_items = logs[start:start + per_page]
+
+    rows = [
+        serialize_attendance_row(log, customer, today)
+        for log, customer in page_items
+    ]
+    return {
+        "rows": rows,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
+        "per_page": per_page,
+    }
+
+
+@app.route('/attendance')
+@login_required
+def attendance():
+    q = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+    page_data = get_attendance_page_data(q=q, page=page)
+
+    return render_template(
+        "attendance.html",
+        page=page_data["page"],
+        total_pages=page_data["total_pages"],
+        total=page_data["total"],
+        per_page=page_data["per_page"],
+        q=q,
+        auto_sync_seconds=ATTENDANCE_PAGE_AUTO_SYNC_SECONDS,
+        initial_rows=page_data["rows"],
+    )
+
+
+@app.route('/attendance/data')
+@login_required
+def attendance_data():
+    q = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+    should_sync = request.args.get('sync', '0') == '1'
+    sync_result = None
+
+    if should_sync and attendance_source_configured():
+        try:
+            sync_result = sync_attendance_now(source_fallback="auto_sync")
+        except Exception as exc:
+            app.logger.warning("Attendance auto sync failed: %s", exc)
+            return jsonify({"success": False, "error": str(exc)}), 500
+
+    page_data = get_attendance_page_data(q=q, page=page)
+    return jsonify({
+        "success": True,
+        "sync": sync_result,
+        **page_data,
+    })
+
+
+@app.route('/attendance/sync', methods=['POST'])
+@login_required
+def attendance_sync_now():
+    q = request.form.get('q', '').strip()
+    page = request.form.get('page', '1').strip()
+    auto_sync = (
+        request.form.get('auto_sync') == '1'
+        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    )
+    try:
+        result = sync_attendance_now(source_fallback="auto_sync" if auto_sync else "manual_sync")
+        if auto_sync:
+            status_code = 200 if result.get("success") else 400
+            return jsonify(result), status_code
+
+        if not result.get("success"):
+            if result.get("error") == "fetch_not_configured":
+                flash("Attendance sync is not configured. Set ZK_IP or ATTENDANCE_FETCH_URL.", "error")
+            else:
+                flash("Attendance sync failed.", "error")
+        elif result.get("message") == "no_events":
+            flash("Sync completed. No new attendance events were returned.", "success")
+        else:
+            flash(
+                (
+                    f"Sync completed. Inserted: {result['inserted']}, "
+                    f"Duplicates: {result['duplicates']}, Invalid: {result['invalid']}, "
+                    f"Unknown thumb IDs: {len(result['unknown_ids'])}"
+                ),
+                "success"
+            )
+    except Exception as exc:
+        app.logger.warning("Manual attendance sync failed: %s", exc)
+        if auto_sync:
+            return jsonify({"success": False, "error": str(exc)}), 500
+        flash(f"Attendance sync failed: {exc}", "error")
+
+    redirect_kwargs = {"q": q} if q else {}
+    if page.isdigit() and int(page) > 1:
+        redirect_kwargs["page"] = int(page)
+    return redirect(url_for('attendance', **redirect_kwargs))
+
+
+@app.route('/api/attendance/ingest', methods=['POST'])
+def ingest_attendance():
+    ingest_key = request.headers.get("X-INGEST-KEY", "")
+    if not INGEST_SECRET:
+        app.logger.error("ATTENDANCE_INGEST_KEY is not configured.")
+        return jsonify({"success": False, "error": "ingest_not_configured"}), 500
+    if ingest_key != INGEST_SECRET:
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    events = extract_attendance_events(payload)
+    if not isinstance(events, list) or not events:
+        return jsonify({"success": False, "error": "invalid_payload"}), 400
+
+    result = process_attendance_events(
+        events,
+        source_fallback="zkteco_bridge",
+        one_per_day=True,
+    )
+    app.logger.info(
+        "Attendance ingest completed: inserted=%s duplicates=%s invalid=%s unknown=%s",
+        result["inserted"],
+        result["duplicates"],
+        result["invalid"],
+        len(result["unknown_ids"])
+    )
+    return jsonify(result), 200
 
 @app.route('/update_customer_status/<int:customer_id>', methods=['POST'])
 def update_customer_status(customer_id):
@@ -420,6 +965,7 @@ def update_status(cnic):
     package_price = int(package_obj.package_price) if package_obj and package_obj.package_price else 0
     registration_fees = int(request.form.get('registration_fees', 0))
     discount_amount = int(request.form.get('discount_amount', 0))
+    thumb_id = (request.form.get('thumb_id') or '').strip()
     total_amount = package_price + registration_fees
     amount_after_discount = total_amount - discount_amount
     paid_amount = int(request.form.get('paid_amount', 0))
@@ -433,6 +979,15 @@ def update_status(cnic):
         customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
     customer.status = 'Active'
     customer.discount_amount = discount_amount
+    if thumb_id:
+        duplicate = Customer.query.filter(
+            Customer.thumb_id == thumb_id,
+            Customer.id != customer.id
+        ).first()
+        if duplicate:
+            flash('Thumb ID is already assigned to another customer.', 'error')
+            return redirect(url_for('manage_customer', cnic=customer.cnic))
+    customer.thumb_id = thumb_id or None
 
     remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).first()
     if not remaining_entry:
@@ -997,30 +1552,24 @@ def mark_absent_inactive():
         flash("Unauthorized", "danger")
         return redirect(url_for('dashboard'))
 
-    cust_inactive_count = emp_inactive_count = 0
+    cust_inactive_count = 0
+    threshold_dt = datetime.utcnow() - timedelta(days=ATTENDANCE_INACTIVE_DAYS)
 
     # Customers
     customers = Customer.query.filter_by(status='Active').all()
     for customer in customers:
-        attendance_exists = Attendance.query.filter(
-            Attendance.thumb_id == customer.thumb_id
-        ).first()
-        if not attendance_exists:
+        latest_log = Attendance.query.filter(
+            Attendance.customer_id == customer.id
+        ).order_by(Attendance.check_in_at.desc()).first()
+        if (not latest_log) or (latest_log.check_in_at < threshold_dt):
             customer.status = 'Inactive'
             cust_inactive_count += 1
 
-    # Employees
-    employees = Employee.query.filter_by(status='Active').all()
-    for employee in employees:
-        attendance_exists = Attendance.query.filter(
-            Attendance.thumb_id == employee.thumb_id
-        ).first()
-        if not attendance_exists:
-            employee.status = 'Inactive'
-            emp_inactive_count += 1
-
     db.session.commit()
-    flash(f"Marked {cust_inactive_count} customers and {emp_inactive_count} employees as Inactive (no attendance on record).", "success")
+    flash(
+        f"Marked {cust_inactive_count} customers as Inactive (no attendance in last {ATTENDANCE_INACTIVE_DAYS} days).",
+        "success"
+    )
     return redirect(url_for('dashboard'))
 
 # salary routes ==============
@@ -1131,5 +1680,18 @@ def check_username():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        try:
+            ensure_attendance_schema()
+        except Exception as exc:
+            app.logger.warning("Attendance schema sync skipped: %s", exc)
+        try:
+            ensure_billing_history_schema()
+        except Exception as exc:
+            app.logger.warning("Billing history schema sync skipped: %s", exc)
+        try:
+            ensure_salary_history_schema()
+        except Exception as exc:
+            app.logger.warning("Salary history schema sync skipped: %s", exc)
+    start_attendance_cronjob()
     app.run(debug=True)
 

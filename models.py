@@ -94,10 +94,17 @@ class Trainer(db.Model):
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    timestamp = db.Column(db.DateTime)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False, index=True)
+    thumb_id = db.Column(db.String(100), nullable=False, index=True)
+    check_in_at = db.Column(db.DateTime, nullable=False, index=True)
+    source = db.Column(db.String(50), default='zkteco_bridge')
+    device_sn = db.Column(db.String(100))
+    raw_uid = db.Column(db.String(100))
+    event_id = db.Column(db.String(120), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    customer = db.relationship('Customer', backref=db.backref('attendance_logs', lazy=True))
 
 class Billing(db.Model):
     id = db.Column(db.Integer, primary_key=True)

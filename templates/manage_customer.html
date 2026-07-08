@@ -102,6 +102,10 @@
                 <label>Discount Amount</label>
                 <input type="number" min="0" step="1" name="discount_amount" id="discount-amount" value="{{ customer.discount_amount }}" required>
             </div>
+              <div class="form-group">
+                  <label>Thumb ID</label>
+                  <input type="text" name="thumb_id" id="thumb-id" value="{{ customer.thumb_id or '' }}" placeholder="Enter thumb ID">
+              </div>
 
               <div class="form-group">
                   <label>Paid Amount</label>

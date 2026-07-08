@@ -1,31 +1,22 @@
 from app import app, db
-from models import Customer, Employee, Attendance
-from flask import jsonify
+from models import Customer, Attendance
+from datetime import datetime, timedelta
 
 with app.app_context():
-    # --- For Customers ---
+    inactive_days = 30
+    threshold_dt = datetime.utcnow() - timedelta(days=inactive_days)
+
+    # --- For Customers only ---
     customers = Customer.query.filter_by(status='Active').all()
     cust_inactive_count = 0
     for customer in customers:
-        # If no attendance exists for this customer's thumb_id or cnic, mark as inactive
-        attendance_exists = Attendance.query.filter(
-            (Attendance.thumb_id == customer.thumb_id)  # assuming attendance has thumb_id field
-        ).first()
-        if not attendance_exists:
+        latest_log = Attendance.query.filter(
+            Attendance.customer_id == customer.id
+        ).order_by(Attendance.check_in_at.desc()).first()
+        if (not latest_log) or (latest_log.check_in_at < threshold_dt):
             customer.status = 'Inactive'
             cust_inactive_count += 1
 
-    # --- For Employees ---
-    employees = Employee.query.filter_by(status='Active').all()
-    emp_inactive_count = 0
-    for employee in employees:
-        attendance_exists = Attendance.query.filter(
-            (Attendance.thumb_id == employee.thumb_id)
-        ).first()
-        if not attendance_exists:
-            employee.status = 'Inactive'
-            emp_inactive_count += 1
-
     db.session.commit()
-    print(f"Marked {cust_inactive_count} customers and {emp_inactive_count} employees as Inactive due to no attendance record.")
+    print(f"Marked {cust_inactive_count} customers as Inactive due to no attendance in the last {inactive_days} days.")
     
