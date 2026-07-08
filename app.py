@@ -25,7 +25,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_Waheedadmin:Waheed%401122@148.163.100.132:3306/mygymlahore_mygymbarkatmarket'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_admin_alphafitnessgym:Waqas%400336@148.163.100.132:3306/mygymlahore_alphafitnessgym'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_admin_alphafitnessgym:Waqas%400335@148.163.100.132:3306/mygymlahore_alphafitnessgym'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
