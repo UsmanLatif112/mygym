@@ -7,7 +7,7 @@ import pymysql
 DB_CONFIG = {
     "host": "148.163.100.132",
     "user": "mygymlahore_admin_alphafitnessgym",
-    "password": "Waqas@0336",
+    "password": "Waqas@0335",
     "database": "mygymlahore_alphafitnessgym",
     "port": 3306,
     "charset": "utf8mb4",
@@ -27,7 +27,13 @@ COLUMNS = [
     "terms_accepted", "thumb_id", "created_at", "updated_at", "discount_amount"
 ]
 
-DATE_COLUMNS = {"admission_date", "billing_date", "dob", "created_at", "updated_at"}
+DATE_COLUMNS = {
+    "admission_date",
+    "billing_date",
+    "dob",
+    "created_at",
+    "updated_at"
+}
 
 INSERT_SQL = f"""
 INSERT INTO {TABLE_NAME} (
@@ -41,14 +47,18 @@ INSERT INTO {TABLE_NAME} (
 def clean(value):
     if value is None:
         return None
+
     value = str(value).strip()
+
     if value == "":
         return None
+
     return value
 
 
 def parse_date(value):
     value = clean(value)
+
     if not value:
         return None
 
@@ -74,31 +84,44 @@ def parse_date(value):
             dt = datetime.strptime(value, fmt)
             return dt.strftime("%Y-%m-%d")
         except ValueError:
-            continue
+            pass
 
     return value
 
 
-if __name__ == "__main__":
+def main():
     csv_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CSV_PATH
 
     conn = pymysql.connect(**DB_CONFIG)
+
     inserted = 0
     failed = 0
 
     try:
         with conn.cursor() as cursor:
-            with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+
+            with open(
+                csv_path,
+                "r",
+                encoding="cp1252",     # Excel/Windows encoding
+                errors="replace",       # Prevent UnicodeDecodeError
+                newline=""
+            ) as f:
+
                 reader = csv.DictReader(f)
 
                 for row_num, row in enumerate(reader, start=1):
+
                     values = []
+
                     for col in COLUMNS:
                         value = row.get(col)
+
                         if col in DATE_COLUMNS:
                             value = parse_date(value)
                         else:
                             value = clean(value)
+
                         values.append(value)
 
                     try:
@@ -111,12 +134,25 @@ if __name__ == "__main__":
 
                     except Exception as e:
                         failed += 1
-                        conn.rollback()
-                        print(f"Row {row_num} failed: {e}")
 
-                conn.commit()
+                        print(f"\nRow {row_num} failed")
+                        print(e)
+                        print("-" * 80)
 
-        print(f"Done. Inserted: {inserted}, Failed: {failed}")
+                        # Continue with next row
+                        continue
+
+            conn.commit()
+
+        print("\n===================================")
+        print(f"Inserted : {inserted}")
+        print(f"Failed   : {failed}")
+        print("Import Complete")
+        print("===================================")
 
     finally:
         conn.close()
+
+
+if __name__ == "__main__":
+    main()

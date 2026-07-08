@@ -16,8 +16,19 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import or_, text
 from urllib.parse import urlparse
 from helper import parse_float, get_billing_date, parse_tagify, get_customer_type, generate_membership_no, serialize_billing_history
+from helper import (
+    parse_float,
+    get_billing_date,
+    parse_tagify,
+    get_customer_type,
+    generate_membership_no,
+    serialize_billing_history,
+    register_or_enroll_customer_on_zkteco,
+)
+
 from utils import paginate_list
-from attendance_utils import parse_check_in_at, should_skip_duplicate
+from attendance_utils import parse_check_in_at, should_skip_duplicate   
+from zk import ZK
 
 
 load_dotenv()
@@ -500,7 +511,6 @@ def build_attendance_query(q):
 
     return query.order_by(Attendance.check_in_at.desc())
 
-
 def serialize_attendance_row(log, customer, today):
     pending_class = None
     pending_text = "N/A"
@@ -510,9 +520,12 @@ def serialize_attendance_row(log, customer, today):
         if days_left < 0:
             pending_class = "pending-overdue"
             pending_text = f"Overdue by {-days_left} day{'s' if -days_left != 1 else ''}"
+        elif days_left == 0:
+            pending_class = "pending-due-today"
+            pending_text = "Due today"
         elif days_left <= 2:
             pending_class = "pending-due-soon"
-            pending_text = "Due today" if days_left == 0 else f"{days_left} day{'s' if days_left != 1 else ''} left"
+            pending_text = f"{days_left} day{'s' if days_left != 1 else ''} left"
         else:
             pending_class = "pending-ok"
             pending_text = f"{days_left} day{'s' if days_left != 1 else ''} left"
@@ -525,6 +538,32 @@ def serialize_attendance_row(log, customer, today):
         "pending_class": pending_class,
         "pending_text": pending_text,
     }
+
+
+# def serialize_attendance_row(log, customer, today):
+#     pending_class = None
+#     pending_text = "N/A"
+
+#     if customer and customer.billing_date:
+#         days_left = (customer.billing_date - today).days
+#         if days_left < 0:
+#             pending_class = "pending-overdue"
+#             pending_text = f"Overdue by {-days_left} day{'s' if -days_left != 1 else ''}"
+#         elif days_left <= 2:
+#             pending_class = "pending-due-soon"
+#             pending_text = "Due today" if days_left == 0 else f"{days_left} day{'s' if days_left != 1 else ''} left"
+#         else:
+#             pending_class = "pending-ok"
+#             pending_text = f"{days_left} day{'s' if days_left != 1 else ''} left"
+
+#     return {
+#         "member_name": customer.name if customer else "Unknown (thumb not mapped)",
+#         "membership_no": customer.membership_no if customer else "N/A",
+#         "thumb_id": log.thumb_id or "N/A",
+#         "check_in_at": log.check_in_at.strftime("%Y-%m-%d %H:%M:%S") if log.check_in_at else "N/A",
+#         "pending_class": pending_class,
+#         "pending_text": pending_text,
+#     }
 
 
 def get_attendance_page_data(q="", page=1, per_page=20):
@@ -727,7 +766,7 @@ def add_customer():
         admission_date = form.admission_date.data
         package_id = int(form.package.data)
         package_obj = Packages.query.get(package_id)
-        billing_date = get_billing_date(admission_date, package_obj.package_duration)
+        billing_date = admission_date
         customer_type = form.training_type.data
 
         if customer_type == 'Individual':
@@ -898,7 +937,8 @@ def edit_customer(cnic):
         customer.type = form.training_type.data
         customer.package_id = int(form.package.data)
         customer.admission_date = form.admission_date.data
-        customer.billing_date = get_billing_date(customer.admission_date, package_obj.package_duration)
+        if not customer.billing_date:
+            customer.billing_date = customer.admission_date
 
         # Trainer logic
         if customer.type == 'Individual':
@@ -928,6 +968,31 @@ def edit_customer(cnic):
         edit_mode=True
     )
 
+@app.route('/customers/<cnic>/register-fingerprint', methods=['POST'])
+@login_required
+def register_customer_fingerprint(cnic):
+    customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+
+    try:
+        result = register_or_enroll_customer_on_zkteco(customer)
+
+        return jsonify({
+            "success": True,
+            "thumb_id": result["thumb_id"],
+            "uid": result["uid"],
+            "created": result["created"],
+            "message": f"{result['message']} Thumb ID: {result['thumb_id']}"
+        }), 200
+
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception("Fingerprint registration failed for customer cnic=%s", cnic)
+        return jsonify({
+            "success": False,
+            "error": str(exc)
+        }), 500
+
+
 
 @app.route('/update_billing_date/<cnic>', methods=['POST'])
 @login_required
@@ -956,79 +1021,202 @@ def delete_customer(cnic):
     flash("Customer deleted successfully!", "success")
     return redirect(url_for('customers'))
 
+# @app.route('/update_status/<cnic>', methods=['POST'])
+# @login_required
+# def update_status(cnic):
+#     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+
+#     try:
+#         package_obj = Packages.query.get(customer.package_id)
+
+#         package_price = int(package_obj.package_price) if package_obj and package_obj.package_price else 0
+#         registration_fees = int(float(request.form.get('registration_fees', 0) or 0))
+#         discount_amount = int(float(request.form.get('discount_amount', 0) or 0))
+#         paid_amount = int(float(request.form.get('paid_amount', 0) or 0))
+
+#         total_amount = package_price + registration_fees
+#         amount_after_discount = total_amount - discount_amount
+#         remaining_amount = amount_after_discount - paid_amount
+#         if remaining_amount < 0:
+#             remaining_amount = 0
+
+#         payment_collected_by = (request.form.get('collector_name') or '').strip()
+#         payment_method = (request.form.get('payment_method') or '').strip()
+#         transaction_id = (request.form.get('transaction_id') or '').strip()
+
+#         # Preserve existing thumb_id unless a new non-empty one is explicitly submitted
+#         submitted_thumb_id = (request.form.get('thumb_id') or '').strip()
+#         if submitted_thumb_id:
+#             duplicate = Customer.query.filter(
+#                 Customer.thumb_id == submitted_thumb_id,
+#                 Customer.id != customer.id
+#             ).first()
+#             if duplicate:
+#                 flash('Thumb ID is already assigned to another customer.', 'error')
+#                 return redirect(url_for('manage_customer', cnic=customer.cnic))
+#             customer.thumb_id = submitted_thumb_id
+
+#         customer.discount_amount = discount_amount
+
+#         # Move billing date to same day next month
+#         base_billing_date = customer.billing_date or datetime.today().date()
+#         customer.billing_date = base_billing_date + relativedelta(months=1)
+
+#         # Update customer status
+#         if remaining_amount <= 0:
+#             customer.status = 'active'
+#         else:
+#             customer.status = 'inactive'
+
+#         # Update or create remaining amount entry
+#         remaining_entry = RemainingAmount.query.filter_by(
+#             membership_no=customer.membership_no
+#         ).first()
+
+#         if not remaining_entry:
+#             remaining_entry = RemainingAmount(
+#                 membership_no=customer.membership_no,
+#                 remaining_amount=remaining_amount
+#             )
+#             db.session.add(remaining_entry)
+#         else:
+#             remaining_entry.remaining_amount = remaining_amount
+
+#         # Create billing entry
+#         billing = Billing(
+#             customer_name=customer.name,
+#             membership_no=customer.membership_no,
+#             customer_cnic=customer.cnic,
+#             paid_to_be_amount=amount_after_discount,
+#             paid_amount=paid_amount,
+#             remaining_amount=remaining_amount,
+#             payment_collected_by=payment_collected_by,
+#             payment_method=payment_method,
+#             transaction_id=transaction_id if transaction_id else None,
+#             discount_amount=discount_amount,
+#             payment_date=datetime.utcnow()
+#         )
+#         db.session.add(billing)
+
+#         # Create billing history entry
+#         billing_history = BillingHistory(
+#             customer_cnic=customer.cnic,
+#             customer_name=customer.name,
+#             membership_no=customer.membership_no,
+#             amount_to_be_paid=amount_after_discount,
+#             paid_amount=paid_amount,
+#             remaining_amount=remaining_amount,
+#             payment_collected_by=payment_collected_by,
+#             payment_method=payment_method,
+#             transaction_id=transaction_id if transaction_id else None,
+#             payment_date=datetime.utcnow()
+#         )
+#         db.session.add(billing_history)
+
+#         db.session.commit()
+#         flash('Status and payment updated successfully.', 'success')
+#         return redirect(url_for('manage_customer', cnic=customer.cnic))
+
+#     except Exception as exc:
+#         db.session.rollback()
+#         flash(f'Failed to update customer status: {str(exc)}', 'error')
+#         return redirect(url_for('manage_customer', cnic=customer.cnic))
+
+
 @app.route('/update_status/<cnic>', methods=['POST'])
 @login_required
 def update_status(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
-    package_obj = Packages.query.get(customer.package_id)
 
-    package_price = int(package_obj.package_price) if package_obj and package_obj.package_price else 0
-    registration_fees = int(request.form.get('registration_fees', 0))
-    discount_amount = int(request.form.get('discount_amount', 0))
-    thumb_id = (request.form.get('thumb_id') or '').strip()
-    total_amount = package_price + registration_fees
-    amount_after_discount = total_amount - discount_amount
-    paid_amount = int(request.form.get('paid_amount', 0))
-    remaining_amount = amount_after_discount - paid_amount
-    next_billing_date = request.form.get('next_billing_date')
-    payment_collected_by = request.form.get('collector_name')
-    payment_method = request.form.get('payment_method', 'Unknown')
-    transaction_id = request.form.get('transaction_id', None)
+    try:
+        package_obj = Packages.query.get(customer.package_id)
 
-    if next_billing_date:
-        customer.billing_date = datetime.strptime(next_billing_date, '%Y-%m-%d')
-    customer.status = 'Active'
-    customer.discount_amount = discount_amount
-    if thumb_id:
-        duplicate = Customer.query.filter(
-            Customer.thumb_id == thumb_id,
-            Customer.id != customer.id
+        package_price = int(package_obj.package_price) if package_obj and package_obj.package_price else 0
+        registration_fees = int(float(request.form.get('registration_fees', 0) or 0))
+        discount_amount = int(float(request.form.get('discount_amount', 0) or 0))
+        paid_amount = int(float(request.form.get('paid_amount', 0) or 0))
+
+        total_amount = package_price + registration_fees
+        amount_after_discount = total_amount - discount_amount
+        remaining_amount = amount_after_discount - paid_amount
+        if remaining_amount < 0:
+            remaining_amount = 0
+
+        payment_collected_by = (request.form.get('collector_name') or '').strip()
+        payment_method = (request.form.get('payment_method') or '').strip()
+        transaction_id = (request.form.get('transaction_id') or '').strip()
+
+        submitted_thumb_id = (request.form.get('thumb_id') or '').strip()
+        if submitted_thumb_id:
+            duplicate = Customer.query.filter(
+                Customer.thumb_id == submitted_thumb_id,
+                Customer.id != customer.id
+            ).first()
+            if duplicate:
+                flash('Thumb ID is already assigned to another customer.', 'error')
+                return redirect(url_for('manage_customer', cnic=customer.cnic))
+            customer.thumb_id = submitted_thumb_id
+
+        customer.discount_amount = discount_amount
+
+        # On payment/status update, extend billing date to one month from today
+        customer.billing_date = datetime.today().date() + relativedelta(months=1)
+
+        if remaining_amount <= 0:
+            customer.status = 'active'
+        else:
+            customer.status = 'inactive'
+
+        remaining_entry = RemainingAmount.query.filter_by(
+            membership_no=customer.membership_no
         ).first()
-        if duplicate:
-            flash('Thumb ID is already assigned to another customer.', 'error')
-            return redirect(url_for('manage_customer', cnic=customer.cnic))
-    customer.thumb_id = thumb_id or None
 
-    remaining_entry = RemainingAmount.query.filter_by(membership_no=customer.membership_no).first()
-    if not remaining_entry:
-        remaining_entry = RemainingAmount(membership_no=customer.membership_no, remaining_amount=remaining_amount)
-        db.session.add(remaining_entry)
-    else:
-        remaining_entry.remaining_amount = remaining_amount
+        if not remaining_entry:
+            remaining_entry = RemainingAmount(
+                membership_no=customer.membership_no,
+                remaining_amount=remaining_amount
+            )
+            db.session.add(remaining_entry)
+        else:
+            remaining_entry.remaining_amount = remaining_amount
 
-    billing = Billing(
-        customer_name=customer.name,
-        membership_no=customer.membership_no,
-        customer_cnic=customer.cnic,
-        paid_to_be_amount=amount_after_discount,
-        paid_amount=paid_amount,
-        remaining_amount=remaining_entry.remaining_amount,
-        payment_collected_by=payment_collected_by,
-        payment_method=payment_method,
-        transaction_id=transaction_id if transaction_id else None,
-        discount_amount=discount_amount,
-        payment_date=datetime.utcnow()
-    )
-    db.session.add(billing)
+        billing = Billing(
+            customer_name=customer.name,
+            membership_no=customer.membership_no,
+            customer_cnic=customer.cnic,
+            paid_to_be_amount=amount_after_discount,
+            paid_amount=paid_amount,
+            remaining_amount=remaining_amount,
+            payment_collected_by=payment_collected_by,
+            payment_method=payment_method,
+            transaction_id=transaction_id if transaction_id else None,
+            discount_amount=discount_amount,
+            payment_date=datetime.utcnow()
+        )
+        db.session.add(billing)
 
-    billing_history = BillingHistory(
-        customer_cnic=customer.cnic,
-        customer_name=customer.name,
-        membership_no=customer.membership_no,
-        amount_to_be_paid=amount_after_discount,
-        paid_amount=paid_amount,
-        remaining_amount=remaining_entry.remaining_amount,
-        payment_collected_by=payment_collected_by,
-        payment_method=payment_method,
-        transaction_id=transaction_id if transaction_id else None,
-        payment_date=datetime.utcnow()
-    )
-    db.session.add(billing_history)
+        billing_history = BillingHistory(
+            customer_cnic=customer.cnic,
+            customer_name=customer.name,
+            membership_no=customer.membership_no,
+            amount_to_be_paid=amount_after_discount,
+            paid_amount=paid_amount,
+            remaining_amount=remaining_amount,
+            payment_collected_by=payment_collected_by,
+            payment_method=payment_method,
+            transaction_id=transaction_id if transaction_id else None,
+            payment_date=datetime.utcnow()
+        )
+        db.session.add(billing_history)
 
-    db.session.commit()
-    flash('Status and payment updated successfully.', 'success')
-    return redirect(url_for('manage_customer', cnic=customer.cnic))
+        db.session.commit()
+        flash('Status and payment updated successfully.', 'success')
+        return redirect(url_for('manage_customer', cnic=customer.cnic))
 
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Failed to update customer status: {str(exc)}', 'error')
+        return redirect(url_for('manage_customer', cnic=customer.cnic))
 
 @app.route('/customer_billing/<cnic>')
 @login_required

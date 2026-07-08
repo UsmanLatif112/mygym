@@ -103,21 +103,9 @@
                 <input type="number" min="0" step="1" name="discount_amount" id="discount-amount" value="{{ customer.discount_amount }}" required>
             </div>
               <div class="form-group">
-                <label>Fingerprint</label>
-                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" class="leet-btn" id="addFingerprintBtn" onclick="registerFingerprint()">
-                        <i class="fa fa-fingerprint"></i> Add Fingerprint
-                    </button>
-                    <span id="fingerprintStatus" style="color:#fff; font-size:14px;">
-                        {% if customer.thumb_id %}
-                            Fingerprint ID assigned: {{ customer.thumb_id }}
-                        {% else %}
-                            No fingerprint assigned yet
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-
+                  <label>Thumb ID</label>
+                  <input type="text" name="thumb_id" id="thumb-id" value="{{ customer.thumb_id or '' }}" placeholder="Enter thumb ID">
+              </div>
 
               <div class="form-group">
                   <label>Paid Amount</label>
@@ -262,49 +250,6 @@ function confirmDelete() {
         } else {
             alert('Failed to delete customer.');
         }
-    });
-}
-</script>
-
-
-<script>
-function registerFingerprint() {
-    const btn = document.getElementById('addFingerprintBtn');
-    const statusEl = document.getElementById('fingerprintStatus');
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
-    statusEl.innerText = 'Creating user on fingerprint machine...';
-
-    fetch("{{ url_for('register_customer_fingerprint', cnic=customer.cnic) }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(async response => {
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'Fingerprint registration failed');
-        }
-        return data;
-    })
-    .then(data => {
-        if (data.success) {
-            statusEl.innerText = data.message;
-            alert(data.message);
-            location.reload();
-        } else {
-            throw new Error(data.error || 'Fingerprint registration failed');
-        }
-    })
-    .catch(error => {
-        statusEl.innerText = error.message;
-        alert(error.message);
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-fingerprint"></i> Add Fingerprint';
     });
 }
 </script>
