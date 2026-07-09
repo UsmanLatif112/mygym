@@ -214,7 +214,7 @@ def process_attendance_events(
         normalized_events.append((event, check_in_at))
 
     if one_per_day:
-        normalized_events.sort(key=lambda item: item[1], reverse=True)
+        normalized_events.sort(key=lambda item: item[1])
 
     inserted = 0
     duplicates = 0
@@ -231,30 +231,22 @@ def process_attendance_events(
             invalid += 1
             continue
 
-        if one_per_day:
-            day_key = (thumb_id, attendance_day)
-            if day_key in batch_seen_days:
-                duplicates += 1
-                continue
-            if thumb_id_has_attendance_on_day(thumb_id, attendance_day):
-                duplicates += 1
-                continue
-            batch_seen_days.add(day_key)
-
         customer = Customer.query.filter_by(thumb_id=thumb_id).first()
         if not customer:
             unknown_ids.append(thumb_id)
             continue
 
-        if event_id and Attendance.query.filter_by(event_id=event_id).first():
+        existing_log = Attendance.query.filter_by(customer_id=customer.id).first()
+        if existing_log:
+            existing_log.check_in_at = check_in_at
+            existing_log.updated_at = datetime.utcnow()
+            existing_log.source = str(event.get("source", source_fallback)).strip() or source_fallback
+            existing_log.device_sn = str(event.get("device_sn", "")).strip() or None
+            existing_log.raw_uid = str(event.get("raw_uid", "")).strip() or None
+            existing_log.event_id = event_id
+            db.session.add(existing_log)
             duplicates += 1
             continue
-
-        if not one_per_day:
-            last_log = Attendance.query.filter_by(customer_id=customer.id).order_by(Attendance.check_in_at.desc()).first()
-            if should_skip_duplicate(last_log, check_in_at, ATTENDANCE_DEDUP_SECONDS):
-                duplicates += 1
-                continue
 
         attendance = Attendance(
             customer_id=customer.id,
@@ -478,14 +470,15 @@ def customers():
 
 
 def dedupe_attendance_by_membership(rows):
-    """Keep only the latest attendance row per membership number."""
+    """Keep only the latest attendance row per membership number per day."""
     seen = set()
     unique_rows = []
     for log, customer in rows:
+        check_in_date = log.check_in_at.date() if log.check_in_at else None
         if customer and customer.membership_no:
-            key = customer.membership_no
+            key = (customer.membership_no, check_in_date)
         else:
-            key = f"thumb:{log.thumb_id or log.id}"
+            key = (f"thumb:{log.thumb_id or log.id}", check_in_date)
         if key in seen:
             continue
         seen.add(key)
