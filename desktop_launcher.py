@@ -40,4 +40,9 @@ if __name__ == "__main__":
 
 
 
-'''pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." desktop_launcher.py'''
+# '''pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." desktop_launcher.py'''
+
+
+
+"""pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." desktop_launcher.py
+"""
