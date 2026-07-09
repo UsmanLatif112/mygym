@@ -31,7 +31,19 @@ from attendance_utils import parse_check_in_at, should_skip_duplicate
 from zk import ZK
 
 
-load_dotenv()
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+bundled_env = resource_path(".env")
+if os.path.exists(bundled_env):
+    load_dotenv(bundled_env)
+else:
+    load_dotenv()
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
@@ -58,15 +70,7 @@ ZK_PASSWORD = int(os.getenv("ZK_PASSWORD", "0"))
 app.logger.setLevel(logging.INFO)
 
 
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
 
-env_path = resource_path(".env")
-load_dotenv(env_path)
 
 
 def ensure_attendance_schema():
