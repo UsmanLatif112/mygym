@@ -4,7 +4,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from models import BillingHistory, db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
 from forms import LoginForm, CustomerForm, EmployeeForm
 from datetime import date, datetime, timedelta, timezone
-import os
+import os,sys
 import logging
 import json
 import time
@@ -56,6 +56,17 @@ ZK_PORT = int(os.getenv("ZK_PORT", "4370"))
 ZK_TIMEOUT = int(os.getenv("ZK_TIMEOUT", "10"))
 ZK_PASSWORD = int(os.getenv("ZK_PASSWORD", "0"))
 app.logger.setLevel(logging.INFO)
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+env_path = resource_path(".env")
+load_dotenv(env_path)
 
 
 def ensure_attendance_schema():
