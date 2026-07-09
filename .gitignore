@@ -24,5 +24,6 @@ dist/
 *.spec
 
 build/
+*.rar
 
 *.zip
