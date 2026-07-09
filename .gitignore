@@ -24,3 +24,5 @@ dist/
 *.spec
 
 build/
+
+*.zip
