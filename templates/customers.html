@@ -51,10 +51,7 @@
         </thead>
         <tbody class=customers-table-body>
             {% for c in customers %}
-            {% set days_until = (c.billing_date - today).days if c.billing_date else 9999 %}
-            {% set is_active = c.status and c.status.lower() == 'active' %}
-            {% set due_soon = is_active and 0 <= days_until <= 2 %}
-            <tr{% if due_soon %} class="row-due-soon"{% endif %} data-status="{{ (c.status or 'Inactive')|lower }}" data-search-text="{{ c.name|lower if c.name else '' }} {{ c.membership_no|lower if c.membership_no else '' }} {{ c.cnic|lower if c.cnic else '' }} {{ c.phone|lower if c.phone else '' }}">
+            <tr data-status="{{ (c.status or 'Inactive')|lower }}" data-search-text="{{ c.name|lower if c.name else '' }} {{ c.membership_no|lower if c.membership_no else '' }} {{ c.cnic|lower if c.cnic else '' }} {{ c.phone|lower if c.phone else '' }}">
                 <td>
                     {% if c.name and c.name|length > 20 %}
                         <span title="{{ c.name }}">{{ c.name[:20] }}&hellip;</span>
@@ -132,9 +129,7 @@
 @keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
 
-.row-due-soon {
-    background-color: #fff4e5;
-}
+
 .due-soon-badge {
     display: inline-block;
     margin-left: 8px;
