@@ -11,21 +11,29 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Customers</h1>
-<div class="customers-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px;">
-    <form method="get" action="{{ url_for('customers') }}" class="customers-search-form" style="flex: 1; max-width: 250px;">
+<div class="customers-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; gap: 16px; flex-wrap: wrap;">
+    <div style="flex: 1; max-width: 250px;">
         <input 
             type="text" 
-            name="q" 
+            id="fe-search-input"
             placeholder="Search by name, membership, phone, or CNIC..." 
             value="{{ request.args.get('q', '') }}"
             class="form-input search-input"
             autocomplete="off"
             style="width: 100%;"
         >
-    </form>
-    <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em; margin-left: 22px;" onclick="window.location='/add_customer'">
-        <i class="fa fa-user-plus"></i> Add Customer
-    </button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <select id="fe-status-filter" class="form-input" style="width: 150px; height: 41px; padding: 0 10px; background: #181818; color: #fff; border: 1px solid #3a3a3a; border-radius: 5px; cursor: pointer;">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="not paid">Not Paid</option>
+            <option value="inactive">Inactive</option>
+        </select>
+        <button class="leet-btn" style="width:auto; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:41px; padding:0 20px; font-size:1em; white-space:nowrap;" onclick="window.location='/add_customer'">
+            <i class="fa fa-user-plus"></i> Add Customer
+        </button>
+    </div>
 </div>
 
 <div class="customers-table-wrap">
@@ -43,10 +51,10 @@
         </thead>
         <tbody class=customers-table-body>
             {% for c in customers %}
-            {% set days_until = (c.billing_date - today).days %}
+            {% set days_until = (c.billing_date - today).days if c.billing_date else 9999 %}
             {% set is_active = c.status and c.status.lower() == 'active' %}
             {% set due_soon = is_active and 0 <= days_until <= 2 %}
-            <tr{% if due_soon %} class="row-due-soon"{% endif %}>
+            <tr{% if due_soon %} class="row-due-soon"{% endif %} data-status="{{ (c.status or 'Inactive')|lower }}" data-search-text="{{ c.name|lower if c.name else '' }} {{ c.membership_no|lower if c.membership_no else '' }} {{ c.cnic|lower if c.cnic else '' }} {{ c.phone|lower if c.phone else '' }}">
                 <td>
                     {% if c.name and c.name|length > 20 %}
                         <span title="{{ c.name }}">{{ c.name[:20] }}&hellip;</span>
@@ -101,21 +109,7 @@
     </table>
 </div>
 
-{% if total_pages and total_pages > 1 %}
-<div class="pagination-wrap" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:24px;">
-    <a href="{{ url_for(request.endpoint, q=request.args.get('q',''), page=page-1) }}"
-       class="page-btn {% if page <= 1 %}disabled{% endif %}">
-        <i class="fa fa-chevron-left"></i> Prev
-    </a>
-
-    <span style="color:#ff7300; font-weight:600;">Page {{ page }} of {{ total_pages }}</span>
-
-    <a href="{{ url_for(request.endpoint, q=request.args.get('q',''), page=page+1) }}"
-       class="page-btn {% if page >= total_pages %}disabled{% endif %}">
-        Next <i class="fa fa-chevron-right"></i>
-    </a>
-</div>
-{% endif %}
+<div class="pagination-wrap" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:24px;"></div>
 
 <style>
 .toast-success {
@@ -181,5 +175,128 @@
     </script>
   {% endif %}
 {% endwith %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const searchInput = document.getElementById("fe-search-input");
+    const statusFilter = document.getElementById("fe-status-filter");
+    const tableBody = document.querySelector(".customers-table-body");
+    const allRows = Array.from(tableBody.querySelectorAll("tr:not(#no-customer-row)"));
+    
+    // Create a "No customer found." placeholder row if it doesn't exist
+    let noCustomerRow = document.getElementById("no-customer-row");
+    if (!noCustomerRow) {
+        noCustomerRow = document.createElement("tr");
+        noCustomerRow.id = "no-customer-row";
+        noCustomerRow.innerHTML = `<td colspan="7" style="text-align:center; padding:20px; color:#aaa; background:#181818;">No customer found.</td>`;
+        tableBody.appendChild(noCustomerRow);
+    }
+    noCustomerRow.style.display = "none";
+
+    const itemsPerPage = 20;
+    let currentPage = 1;
+    let filteredRows = [...allRows];
+
+    function updateTable() {
+        const query = searchInput.value.toLowerCase().trim();
+        const selectedStatus = statusFilter.value;
+
+        // Filter rows based on search and status
+        filteredRows = allRows.filter(row => {
+            const searchText = row.getAttribute("data-search-text") || "";
+            const rowStatus = row.getAttribute("data-status") || "";
+            
+            const matchesSearch = !query || searchText.includes(query);
+            const matchesStatus = (selectedStatus === "all") || (rowStatus === selectedStatus);
+            
+            return matchesSearch && matchesStatus;
+        });
+
+        const totalItems = filteredRows.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+        // Clamp page
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        // Show/hide rows for the current page
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+
+        allRows.forEach(row => {
+            row.style.display = "none";
+        });
+
+        if (totalItems === 0) {
+            noCustomerRow.style.display = "";
+        } else {
+            noCustomerRow.style.display = "none";
+            filteredRows.slice(startIndex, endIndex).forEach(row => {
+                row.style.display = "";
+            });
+        }
+
+        // Update Pagination Controls
+        updatePagination(currentPage, totalPages);
+    }
+
+    function updatePagination(page, totalPages) {
+        const paginationWrap = document.querySelector(".pagination-wrap");
+        if (!paginationWrap) return;
+
+        if (totalPages <= 1) {
+            paginationWrap.style.display = "none";
+            return;
+        } else {
+            paginationWrap.style.display = "flex";
+        }
+
+        paginationWrap.innerHTML = `
+            <button id="prev-page" class="page-btn ${page <= 1 ? 'disabled' : ''}" style="border:none; cursor:pointer;">
+                <i class="fa fa-chevron-left"></i> Prev
+            </button>
+            <span style="color:#ff7300; font-weight:600;">Page ${page} of ${totalPages}</span>
+            <button id="next-page" class="page-btn ${page >= totalPages ? 'disabled' : ''}" style="border:none; cursor:pointer;">
+                Next <i class="fa fa-chevron-right"></i>
+            </button>
+        `;
+
+        // Add event listeners to the buttons
+        const prevBtn = paginationWrap.querySelector("#prev-page");
+        const nextBtn = paginationWrap.querySelector("#next-page");
+
+        if (page > 1) {
+            prevBtn.addEventListener("click", function() {
+                currentPage--;
+                updateTable();
+            });
+        }
+        if (page < totalPages) {
+            nextBtn.addEventListener("click", function() {
+                currentPage++;
+                updateTable();
+            });
+        }
+    }
+
+    // Set up real-time event listeners
+    searchInput.addEventListener("input", function() {
+        currentPage = 1;
+        updateTable();
+    });
+
+    statusFilter.addEventListener("change", function() {
+        currentPage = 1;
+        updateTable();
+    });
+
+    // Initial run
+    updateTable();
+});
+</script>
 
 {% endblock %}

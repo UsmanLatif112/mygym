@@ -18,3 +18,9 @@ venv/
 # OS/editor artifacts
 .DS_Store
 Thumbs.db
+
+dist/
+
+*.spec
+
+build/

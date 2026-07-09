@@ -433,20 +433,8 @@ def dashboard():
 @app.route('/customers')
 @login_required
 def customers():
-    q = request.args.get('q', '').strip()
-    query = Customer.query
-    if q:
-        query = query.filter(
-            db.or_(
-                Customer.name.ilike(f"%{q}%"),
-                Customer.membership_no.ilike(f"%{q}%"),
-                Customer.cnic.ilike(f"%{q}%"),
-                Customer.phone.ilike(f"%{q}%")
-            )
-        )
-        
+    customers_list = Customer.query.all()
     
-    customers_list = query.all()
     # Fetch all packages and create a dict for quick lookup
     packages = Packages.query.all()
     packages_dict = {p.id: p for p in packages}
@@ -457,6 +445,8 @@ def customers():
     today = date.today()
     
     def sort_key(c):
+        if not c.billing_date:
+            return (2, date.max)
         days_until = (c.billing_date - today).days
         is_active = c.status and c.status.lower() == 'active'
         is_due_soon = is_active and 0 <= days_until <= 2
@@ -464,16 +454,11 @@ def customers():
         # Group 1: everyone else -> sorted by billing date
         return (0 if is_due_soon else 1, c.billing_date)
     customers = sorted(customers_list, key=sort_key)
-    pagination = paginate_list(customers, default_per_page=20)
     return render_template(
         "customers.html",
-        customers=pagination["items"],       # <-- was 'customers' (the full list), now the paginated slice
+        customers=customers,
         packages_dict=packages_dict,
-        today=today,
-        page=pagination["page"],
-        total_pages=pagination["total_pages"],
-        total=pagination["total"],
-        per_page=pagination["per_page"]
+        today=today
     )
 
 
