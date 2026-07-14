@@ -526,10 +526,17 @@ def serialize_attendance_row(log, customer, today):
     return {
         "member_name": customer.name if customer else "Unknown (thumb not mapped)",
         "membership_no": customer.membership_no if customer else "N/A",
+        "cnic": customer.cnic if customer else None,
         "thumb_id": log.thumb_id or "N/A",
         "check_in_at": log.check_in_at.strftime("%Y-%m-%d %H:%M:%S") if log.check_in_at else "N/A",
         "pending_class": pending_class,
         "pending_text": pending_text,
+        # Show $ billing button for overdue, due today, or due within 2 days
+        "billing_due": pending_class in (
+            "pending-overdue",
+            "pending-due-today",
+            "pending-due-soon",
+        ),
     }
 
 
@@ -862,6 +869,11 @@ def manage_customer(cnic):
     registration_fees = int(pkg.registration_fees) if pkg and pkg.registration_fees else 0
     amount_to_be_paid = package_price + registration_fees
 
+    # Preview next billing date: current billing (or admission) + package duration
+    base_billing_date = customer.billing_date or customer.admission_date
+    package_duration = pkg.package_duration if pkg else '1 Month'
+    next_billing_date = get_billing_date(base_billing_date, package_duration) if base_billing_date else None
+
     return render_template(
         "manage_customer.html",
         customer=customer,
@@ -871,6 +883,7 @@ def manage_customer(cnic):
         registration_fees=registration_fees,
         amount_to_be_paid=amount_to_be_paid,
         employees=employees,
+        next_billing_date=next_billing_date,
     )
 
 @app.route('/edit_customer/<cnic>', methods=['GET', 'POST'])
@@ -1152,13 +1165,21 @@ def update_status(cnic):
 
         customer.discount_amount = discount_amount
 
-        # On payment/status update, extend billing date to one month from today
-        customer.billing_date = datetime.today().date() + relativedelta(months=1)
+        # Billing date: use staff value if provided, otherwise auto-calculate
+        # from current billing/admission + package duration.
+        package_duration = package_obj.package_duration if package_obj else '1 Month'
+        base_billing_date = customer.billing_date or customer.admission_date or datetime.today().date()
+        auto_billing_date = get_billing_date(base_billing_date, package_duration)
 
-        if remaining_amount <= 0:
-            customer.status = 'active'
+        submitted_billing = (request.form.get('next_billing_date') or '').strip()
+        if submitted_billing:
+            customer.billing_date = datetime.strptime(submitted_billing, '%Y-%m-%d').date()
         else:
-            customer.status = 'inactive'
+            customer.billing_date = auto_billing_date
+
+        # Payment from Not Paid is a manual unpaid → active transition.
+        # Remaining amount must not force inactive.
+        customer.status = 'active'
 
         remaining_entry = RemainingAmount.query.filter_by(
             membership_no=customer.membership_no
@@ -1487,6 +1508,42 @@ def billing():
         billing_dict=billing_dict
     )
 
+@app.route('/billing_payment_info/<cnic>', methods=['GET'])
+@login_required
+def billing_payment_info(cnic):
+    """JSON payload for Add Payment modal (billing history logic)."""
+    customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+    pkg = Packages.query.get(customer.package_id)
+    package_price = int(pkg.package_price) if pkg and pkg.package_price else 0
+    discount_amount = customer.discount_amount or 0
+
+    billing = Billing.query.filter_by(customer_cnic=customer.cnic).order_by(Billing.payment_date.desc()).first()
+    previous_remaining = billing.remaining_amount if billing else 0
+    amount_to_be_paid = package_price - discount_amount + previous_remaining
+
+    base_billing_date = customer.billing_date or customer.admission_date
+    package_duration = pkg.package_duration if pkg else '1 Month'
+    next_billing_date = get_billing_date(base_billing_date, package_duration) if base_billing_date else None
+
+    employees = Employee.query.order_by(Employee.name).all()
+
+    return jsonify({
+        "success": True,
+        "cnic": customer.cnic,
+        "name": customer.name,
+        "membership_no": customer.membership_no,
+        "package_name": pkg.package_name if pkg else "",
+        "package_price": package_price,
+        "discount_amount": discount_amount,
+        "previous_remaining": previous_remaining,
+        "amount_to_be_paid": amount_to_be_paid,
+        "current_billing_date": customer.billing_date.strftime("%Y-%m-%d") if customer.billing_date else "",
+        "next_billing_date": next_billing_date.strftime("%Y-%m-%d") if next_billing_date else "",
+        "submit_url": url_for("add_billing_history", cnic=customer.cnic),
+        "employees": [{"name": e.name} for e in employees],
+    })
+
+
 @app.route('/billing_history/<cnic>', methods=['GET'])
 @login_required
 def billing_history(cnic):
@@ -1504,6 +1561,11 @@ def billing_history(cnic):
     history = BillingHistory.query.filter_by(customer_cnic=cnic).order_by(BillingHistory.payment_date.desc()).all()
     serialized_history = [serialize_billing_history(b) for b in history]
 
+    # Preview next billing date for Add Payment form
+    base_billing_date = customer.billing_date or customer.admission_date
+    package_duration = pkg.package_duration if pkg else '1 Month'
+    next_billing_date = get_billing_date(base_billing_date, package_duration) if base_billing_date else None
+
     return render_template(
         'billing_history.html',
         customer=customer,
@@ -1514,6 +1576,7 @@ def billing_history(cnic):
         package_price=package_price,
         previous_remaining=previous_remaining,
         amount_to_be_paid=amount_to_be_paid,
+        next_billing_date=next_billing_date,
     )
 
 
@@ -1565,6 +1628,20 @@ def add_billing_history(cnic):
     amount_to_be_paid = package_price - discount_amount + last_remaining
     new_remaining = amount_to_be_paid - paid_amount  # Allow negative values
 
+    # Billing date: use set date if provided, otherwise auto-calculate
+    # from current billing/admission + package duration.
+    package_duration = pkg.package_duration if pkg else '1 Month'
+    base_billing_date = customer.billing_date or customer.admission_date or datetime.today().date()
+    auto_billing_date = get_billing_date(base_billing_date, package_duration)
+    submitted_billing = (request.form.get('billing_date') or '').strip()
+    if submitted_billing:
+        customer.billing_date = datetime.strptime(submitted_billing, '%Y-%m-%d').date()
+    else:
+        customer.billing_date = auto_billing_date
+
+    # Do not change status from remaining amount.
+    # Status only changes manually or via 7-day no-attendance rule.
+
     # Add new entry to RemainingAmount
     new_remaining_entry = RemainingAmount(
         membership_no=customer.membership_no,
@@ -1613,7 +1690,24 @@ def add_billing_history(cnic):
         billing.payment_date = datetime.utcnow()
 
     db.session.commit()
+
+    wants_json = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or request.accept_mimetypes.best == 'application/json'
+        or request.args.get('format') == 'json'
+    )
+    if wants_json:
+        return jsonify({
+            "success": True,
+            "message": "Payment added to billing history!",
+            "billing_date": customer.billing_date.strftime("%Y-%m-%d") if customer.billing_date else None,
+            "remaining_amount": new_remaining,
+        })
+
     flash('Payment added to billing history!', 'success')
+    next_url = (request.form.get('next') or '').strip()
+    if next_url:
+        return redirect(next_url)
     return redirect(url_for('billing_history', cnic=customer.cnic))
 
 # # expense routes ==============

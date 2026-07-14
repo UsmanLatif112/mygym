@@ -23,17 +23,29 @@ def parse_float(val):
     except ValueError:
         return None
     
-def get_billing_date(admission_date, package):
-    # Defensive: if package is None, treat as '1Month'
-    if not package:
-        months = 1
-    elif '3Month' in package:
-        months = 3
-    elif '6Month' in package:
-        months = 6
-    else:
-        months = 1
-    return admission_date + relativedelta(months=months)
+def parse_package_months(package_duration):
+    """Convert package duration strings like '1 Month', '3 Months', '1 Year' to months."""
+    if not package_duration:
+        return 1
+    duration = str(package_duration).lower().replace(' ', '')
+    if 'year' in duration or duration in ('12month', '12months'):
+        return 12
+    if '6month' in duration:
+        return 6
+    if '3month' in duration:
+        return 3
+    return 1
+
+
+def get_billing_date(base_date, package_duration):
+    """
+    Next billing date from base_date (admission or current billing)
+    advanced by the package duration.
+    """
+    if not base_date:
+        return None
+    months = parse_package_months(package_duration)
+    return base_date + relativedelta(months=months)
 
 
 def parse_tagify(data):

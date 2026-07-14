@@ -43,6 +43,7 @@
                 <th>Thumb ID</th>
                 <th>Check-in Time (UTC)</th>
                 <th>Pending Days</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody id="attendance-table-body" class="customers-table-body"></tbody>
@@ -64,6 +65,66 @@
     </a>
 </div>
 {% endif %}
+
+<!-- Add Payment modal (same logic as billing history) -->
+<div id="addPaymentModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width:400px; max-height:85vh; overflow-y:auto;">
+    <h2 style="margin-bottom: 5px; margin-top: 5px;">Add Payment</h2>
+    <form id="addPaymentForm">
+      <input type="hidden" id="modal_cnic" value="">
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Customer Name:</label>
+        <input type="text" id="modal_customer_name" readonly class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Membership No:</label>
+        <input type="text" id="modal_membership_no" readonly class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Package:</label>
+        <input type="text" id="modal_package_name" readonly class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Amount to be Paid:</label>
+        <input type="number" min="0" step="1" id="modal_amount_to_be_paid" readonly class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Paid Amount:</label>
+        <input type="number" min="0" step="1" placeholder="Enter paid amount" id="modal_paid_amount" name="paid_amount" class="form-input" required>
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Remaining Amount:</label>
+        <input type="number" id="modal_remaining_fees" class="form-input" readonly>
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Billing Date:</label>
+        <input type="date" name="billing_date" id="modal_billing_date" class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Payment Method:</label>
+        <select name="payment_method" class="form-input" id="modal_payment_method" required>
+          <option value="">Select Method</option>
+          <option value="Cash">Cash</option>
+          <option value="Online">Online</option>
+        </select>
+      </div>
+      <div class="form-block" id="modal_transaction_id_row" style="display:none;">
+        <label>Transaction ID:</label>
+        <input type="text" name="transaction_id" placeholder="Enter transaction ID" id="modal_transaction_id" class="form-input">
+      </div>
+      <div class="form-block" style="margin-bottom:15px;">
+        <label>Payment Collected By:</label>
+        <select name="payment_collected_by" id="modal_payment_collected_by" class="form-input" required>
+            <option value="">Select Employee</option>
+        </select>
+      </div>
+      <div class="form-block" style="display: flex; gap: 10px;">
+        <button type="submit" class="leet-btn" id="modal_save_payment_btn">Save Payment</button>
+        <button type="button" class="leet-btn modal-close-btn" onclick="closeAddPaymentModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <style>
     .pending-days {
@@ -92,6 +153,29 @@
     .pending-overdue {
         color: #b71c1c;
         background: #ffebee;
+    }
+
+    .bill-btn {
+        background: #36b37e;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        width: 36px;
+        height: 36px;
+        cursor: pointer;
+        font-size: 1em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .bill-btn:hover {
+        background: #2f9e6b;
+    }
+
+    .bill-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     .toast-success {
@@ -135,6 +219,7 @@
 
         to {
             opacity: 0;
+            transform: translateY(-30px);
         }
     }
 </style>
@@ -152,17 +237,37 @@
 {% endwith %}
 
 <script>
+    function showAttendanceToast(message, category) {
+        var toast = document.createElement("div");
+        toast.className = "toast-success" + (category === "error" ? " toast-error" : "");
+        toast.innerText = message;
+        document.body.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 2800);
+    }
+
+    function closeAddPaymentModal() {
+        var modal = document.getElementById("addPaymentModal");
+        var form = document.getElementById("addPaymentForm");
+        if (modal) modal.style.display = "none";
+        if (form) form.reset();
+        var txRow = document.getElementById("modal_transaction_id_row");
+        if (txRow) txRow.style.display = "none";
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         var syncIntervalMs = {{ auto_sync_seconds }} * 1000;
-        var q = {{ q| tojson }};
+        var q = {{ q|tojson }};
         var page = {{ page }};
         var isRefreshing = false;
         var dataUrl = "{{ url_for('attendance_data') }}";
-        var initialRows = {{ initial_rows| tojson }};
+        var paymentInfoUrlBase = "{{ url_for('billing_payment_info', cnic='__CNIC__') }}";
+        var initialRows = {{ initial_rows|tojson }};
         var tableBody = document.getElementById("attendance-table-body");
         var syncBtn = document.getElementById("attendance-sync-btn");
+        var addPaymentModal = document.getElementById("addPaymentModal");
+        var addPaymentForm = document.getElementById("addPaymentForm");
+        var currentSubmitUrl = "";
 
-        // Persist announced check-ins across reloads
         var announcedAttendance = new Set();
         try {
             var stored = localStorage.getItem("announcedAttendance");
@@ -179,7 +284,6 @@
         function persistAnnounced() {
             try {
                 var arr = Array.from(announcedAttendance);
-                // Limit size to last 500 items to prevent unbounded growth
                 if (arr.length > 500) {
                     arr = arr.slice(arr.length - 500);
                     announcedAttendance = new Set(arr);
@@ -190,28 +294,20 @@
             }
         }
 
-        // Voice announcement queue to play sounds one by one with a 5-second delay
         var voiceQueue = [];
         var voiceTimer = null;
 
         function processVoiceQueue() {
-            if (voiceQueue.length === 0) {
-                voiceTimer = null;
-                return;
-            }
-
+            voiceTimer = null;
+            if (!voiceQueue.length) return;
             var nextAnnouncement = voiceQueue.shift();
             speakPendingFees(nextAnnouncement.name, nextAnnouncement.text);
-
-            // Schedule next voice announcement in 5 seconds
             voiceTimer = setTimeout(processVoiceQueue, 5000);
         }
 
         function queueVoiceAnnouncement(name, text) {
             voiceQueue.push({ name: name, text: text });
-            if (!voiceTimer) {
-                processVoiceQueue();
-            }
+            if (!voiceTimer) processVoiceQueue();
         }
 
         function escapeHtml(text) {
@@ -220,13 +316,117 @@
             return div.innerHTML;
         }
 
-        function showAttendanceToast(message, category) {
-            var toast = document.createElement("div");
-            toast.className = "toast-success" + (category === "error" ? " toast-error" : "");
-            toast.innerText = message;
-            document.body.appendChild(toast);
-            setTimeout(function () { toast.remove(); }, 2800);
+        function setupModalCalc() {
+            var paidAmountInput = document.getElementById("modal_paid_amount");
+            var remainingFeesInput = document.getElementById("modal_remaining_fees");
+            var amountToBePaidInput = document.getElementById("modal_amount_to_be_paid");
+            var amountToBePaid = parseFloat(amountToBePaidInput.value) || 0;
+
+            function updateRemaining() {
+                var paid = parseFloat(paidAmountInput.value) || 0;
+                remainingFeesInput.value = amountToBePaid - paid;
+            }
+
+            paidAmountInput.oninput = updateRemaining;
+            updateRemaining();
         }
+
+        function fillEmployeeOptions(employees) {
+            var select = document.getElementById("modal_payment_collected_by");
+            select.innerHTML = '<option value="">Select Employee</option>';
+            (employees || []).forEach(function (emp) {
+                var opt = document.createElement("option");
+                opt.value = emp.name;
+                opt.textContent = emp.name;
+                select.appendChild(opt);
+            });
+        }
+
+        window.openBillingModal = function (cnic) {
+            if (!cnic) {
+                showAttendanceToast("Customer not found for this attendance row.", "error");
+                return;
+            }
+
+            var url = paymentInfoUrlBase.replace("__CNIC__", encodeURIComponent(cnic));
+
+            fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+                .then(function (response) {
+                    if (!response.ok) throw new Error("Failed to load billing details");
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data.success) throw new Error(data.error || "Failed to load billing details");
+
+                    currentSubmitUrl = data.submit_url;
+                    document.getElementById("modal_cnic").value = data.cnic || "";
+                    document.getElementById("modal_customer_name").value = data.name || "";
+                    document.getElementById("modal_membership_no").value = data.membership_no || "";
+                    document.getElementById("modal_package_name").value = data.package_name || "";
+                    document.getElementById("modal_amount_to_be_paid").value = data.amount_to_be_paid || 0;
+                    document.getElementById("modal_paid_amount").value = "";
+                    document.getElementById("modal_billing_date").value = data.next_billing_date || data.current_billing_date || "";
+                    document.getElementById("modal_payment_method").value = "";
+                    document.getElementById("modal_transaction_id").value = "";
+                    document.getElementById("modal_transaction_id_row").style.display = "none";
+                    fillEmployeeOptions(data.employees);
+                    setupModalCalc();
+                    addPaymentModal.style.display = "flex";
+                })
+                .catch(function (error) {
+                    showAttendanceToast(error.message || "Failed to open billing modal.", "error");
+                });
+        };
+
+        document.getElementById("modal_payment_method").addEventListener("change", function () {
+            var row = document.getElementById("modal_transaction_id_row");
+            if (this.value === "Online") {
+                row.style.display = "block";
+            } else {
+                row.style.display = "none";
+                document.getElementById("modal_transaction_id").value = "";
+            }
+        });
+
+        addPaymentForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            if (!currentSubmitUrl) {
+                showAttendanceToast("Missing payment submit URL.", "error");
+                return;
+            }
+
+            var saveBtn = document.getElementById("modal_save_payment_btn");
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving...";
+
+            var formData = new FormData(addPaymentForm);
+
+            fetch(currentSubmitUrl, {
+                method: "POST",
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                body: formData
+            })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.error || data.message || "Failed to save payment");
+                        }
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    closeAddPaymentModal();
+                    showAttendanceToast(data.message || "Payment saved.", "success");
+                    refreshAttendanceData(false);
+                })
+                .catch(function (error) {
+                    showAttendanceToast(error.message || "Failed to save payment.", "error");
+                })
+                .finally(function () {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = "Save Payment";
+                });
+        });
 
         function speakPendingFees(memberName, pendingText) {
             var text = "Your fee is pending";
@@ -259,16 +459,13 @@
         }
 
         function maybeAnnouncePending(row) {
-            // Only play sound once per day per customer. Extract date part (YYYY-MM-DD)
             var checkInDate = "N/A";
             if (row.check_in_at && typeof row.check_in_at === "string") {
                 checkInDate = row.check_in_at.substring(0, 10);
             }
             var rowKey = (row.thumb_id || "N/A") + "|" + checkInDate;
 
-            if (announcedAttendance.has(rowKey)) {
-                return;
-            }
+            if (announcedAttendance.has(rowKey)) return;
 
             var shouldAnnounce =
                 row.pending_class === "pending-overdue" ||
@@ -288,97 +485,102 @@
             });
         }
 
-    function renderAttendanceRows(rows) {
-        if (!rows.length) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No attendance records found.</td></tr>';
-            return;
+        function renderAttendanceRows(rows) {
+            if (!rows.length) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No attendance records found.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = rows.map(function (row) {
+                var pendingCell = row.pending_class
+                    ? '<span class="pending-days ' + escapeHtml(row.pending_class) + '">' + escapeHtml(row.pending_text) + '</span>'
+                    : "N/A";
+
+                var actionCell = "—";
+                if (row.billing_due && row.cnic) {
+                    actionCell =
+                        '<button type="button" class="bill-btn" title="Add billing payment" onclick="openBillingModal(\'' +
+                        String(row.cnic).replace(/\\/g, "\\\\").replace(/'/g, "\\'") +
+                        '\')"><i class="fa fa-dollar-sign"></i></button>';
+                }
+
+                return (
+                    "<tr>" +
+                    "<td>" + escapeHtml(row.member_name) + "</td>" +
+                    "<td>" + escapeHtml(row.membership_no) + "</td>" +
+                    "<td>" + escapeHtml(row.thumb_id) + "</td>" +
+                    "<td>" + escapeHtml(row.check_in_at) + "</td>" +
+                    "<td>" + pendingCell + "</td>" +
+                    "<td>" + actionCell + "</td>" +
+                    "</tr>"
+                );
+            }).join("");
         }
 
-        tableBody.innerHTML = rows.map(function (row) {
-            var pendingCell = row.pending_class
-                ? '<span class="pending-days ' + escapeHtml(row.pending_class) + '">' + escapeHtml(row.pending_text) + '</span>'
-                : "N/A";
+        function refreshAttendanceData(showToast) {
+            if (isRefreshing) return;
+            isRefreshing = true;
 
-            return (
-                "<tr>" +
-                "<td>" + escapeHtml(row.member_name) + "</td>" +
-                "<td>" + escapeHtml(row.membership_no) + "</td>" +
-                "<td>" + escapeHtml(row.thumb_id) + "</td>" +
-                "<td>" + escapeHtml(row.check_in_at) + "</td>" +
-                "<td>" + pendingCell + "</td>" +
-                "</tr>"
-            );
-        }).join("");
-    }
+            var params = new URLSearchParams();
+            if (q) params.set("q", q);
+            if (page > 1) params.set("page", page);
+            params.set("sync", "1");
 
-    function refreshAttendanceData(showToast) {
-        if (isRefreshing) return;
-        isRefreshing = true;
-
-        var params = new URLSearchParams();
-        if (q) params.set("q", q);
-        if (page > 1) params.set("page", page);
-        params.set("sync", "1");
-
-        fetch(dataUrl + "?" + params.toString(), {
-            headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-            .then(function (response) {
-                if (!response.ok) {
-                    throw new Error("Failed to refresh attendance");
-                }
-                return response.json();
+            fetch(dataUrl + "?" + params.toString(), {
+                headers: { "X-Requested-With": "XMLHttpRequest" }
             })
-            .then(function (data) {
-                if (!data.success) {
-                    throw new Error(data.error || "Failed to refresh attendance");
-                }
+                .then(function (response) {
+                    if (!response.ok) throw new Error("Failed to refresh attendance");
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (!data.success) throw new Error(data.error || "Failed to refresh attendance");
 
-                var rows = data.rows || [];
-                renderAttendanceRows(rows);
-                processVoiceAlerts(rows);
+                    var rows = data.rows || [];
+                    renderAttendanceRows(rows);
+                    processVoiceAlerts(rows);
 
-                if (showToast && data.sync) {
-                    if (!data.sync.success) {
-                        showAttendanceToast("Attendance sync failed.", "error");
-                    } else if (data.sync.message === "no_events") {
-                        showAttendanceToast("Sync completed. No new attendance events were returned.", "success");
-                    } else {
-                        showAttendanceToast(
-                            "Sync completed. Inserted: " + data.sync.inserted +
-                            ", Duplicates: " + data.sync.duplicates +
-                            ", Invalid: " + data.sync.invalid +
-                            ", Unknown thumb IDs: " + (data.sync.unknown_ids ? data.sync.unknown_ids.length : 0),
-                            "success"
-                        );
+                    if (showToast && data.sync) {
+                        if (!data.sync.success) {
+                            showAttendanceToast("Attendance sync failed.", "error");
+                        } else if (data.sync.message === "no_events") {
+                            showAttendanceToast("Sync completed. No new attendance events were returned.", "success");
+                        } else {
+                            showAttendanceToast(
+                                "Sync completed. Inserted: " + data.sync.inserted +
+                                ", Duplicates: " + data.sync.duplicates +
+                                ", Invalid: " + data.sync.invalid +
+                                ", Unknown thumb IDs: " + (data.sync.unknown_ids ? data.sync.unknown_ids.length : 0),
+                                "success"
+                            );
+                        }
                     }
-                }
-            })
-            .catch(function (error) {
-                if (showToast) {
-                    showAttendanceToast(error.message || "Attendance sync failed.", "error");
-                }
-            })
-            .finally(function () {
-                isRefreshing = false;
+                })
+                .catch(function (error) {
+                    if (showToast) {
+                        showAttendanceToast(error.message || "Attendance sync failed.", "error");
+                    }
+                })
+                .finally(function () {
+                    isRefreshing = false;
+                });
+        }
+
+        renderAttendanceRows(initialRows);
+        setTimeout(function () {
+            processVoiceAlerts(initialRows);
+        }, 800);
+
+        setInterval(function () {
+            refreshAttendanceData(false);
+        }, syncIntervalMs);
+
+        if (syncBtn) {
+            syncBtn.addEventListener("click", function () {
+                refreshAttendanceData(true);
             });
-    }
-
-    renderAttendanceRows(initialRows);
-    setTimeout(function () {
-        processVoiceAlerts(initialRows);
-    }, 800);
-
-    setInterval(function () {
-        refreshAttendanceData(false);
-    }, syncIntervalMs);
-
-    if (syncBtn) {
-        syncBtn.addEventListener("click", function () {
-            refreshAttendanceData(true);
-        });
-    }
-});
+        }
+    });
 </script>
 
 {% endblock %}

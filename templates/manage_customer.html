@@ -104,9 +104,10 @@
             </div>
               <div class="form-group">
                 <label>Fingerprint</label>
+                <input type="hidden" name="thumb_id" id="thumb-id-input" value="{{ customer.thumb_id or '' }}">
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <button type="button" class="leet-btn" id="addFingerprintBtn" onclick="registerFingerprint()">
-                        <i class="fa fa-fingerprint"></i> Add Fingerprint
+                        <i class="fa fa-fingerprint"></i> {% if customer.thumb_id %}Re-enroll Fingerprint{% else %}Add Fingerprint{% endif %}
                     </button>
                     <span id="fingerprintStatus" style="color:#fff; font-size:14px;">
                         {% if customer.thumb_id %}
@@ -129,7 +130,7 @@
               </div>
               <div class="form-group">
                   <label>Next Billing Date</label>
-                  <input type="date" name="next_billing_date" value="{{ customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else '' }}" required>
+                  <input type="date" name="next_billing_date" value="{{ next_billing_date.strftime('%Y-%m-%d') if next_billing_date else (customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else '') }}" required>
               </div>
               <div class="form-group">
                   <label>Payment Method</label>
@@ -271,9 +272,11 @@ function confirmDelete() {
 function registerFingerprint() {
     const btn = document.getElementById('addFingerprintBtn');
     const statusEl = document.getElementById('fingerprintStatus');
+    const thumbInput = document.getElementById('thumb-id-input');
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
+    statusEl.style.color = '#ffb347';
     statusEl.innerText = 'Creating user on fingerprint machine...';
 
     fetch("{{ url_for('register_customer_fingerprint', cnic=customer.cnic) }}", {
@@ -290,21 +293,25 @@ function registerFingerprint() {
         return data;
     })
     .then(data => {
-        if (data.success) {
-            statusEl.innerText = data.message;
-            alert(data.message);
-            location.reload();
-        } else {
+        if (!data.success) {
             throw new Error(data.error || 'Fingerprint registration failed');
         }
+
+        // Keep payment modal open — only update fingerprint UI in place.
+        if (thumbInput && data.thumb_id) {
+            thumbInput.value = data.thumb_id;
+        }
+        statusEl.style.color = '#36b37e';
+        statusEl.innerText = data.message || ('Fingerprint ID assigned: ' + data.thumb_id);
+        btn.innerHTML = '<i class="fa fa-fingerprint"></i> Re-enroll Fingerprint';
     })
     .catch(error => {
+        statusEl.style.color = '#ff6b6b';
         statusEl.innerText = error.message;
-        alert(error.message);
+        btn.innerHTML = '<i class="fa fa-fingerprint"></i> Add Fingerprint';
     })
     .finally(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-fingerprint"></i> Add Fingerprint';
     });
 }
 </script>

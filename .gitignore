@@ -27,3 +27,8 @@ build/
 *.rar
 
 *.zip
+
+# Database backups
+backups/
+*.sql
+!requirements*.txt

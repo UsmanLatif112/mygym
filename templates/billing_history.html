@@ -28,7 +28,17 @@
 <div style="font-size: 0.98em; margin-bottom: 10px; color: #fff;">
     Remaining Amount: <span style="color:#ffb347; font-weight:600;">{{ current_balance }}</span>
 </div>
-<div style="text-align: right; margin-bottom: 26px;">
+<div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:26px; flex-wrap:wrap;">
+  <div style="flex:1; max-width:320px;">
+    <input
+      type="text"
+      id="fe-search-input"
+      placeholder="Search by date, method, collector, Tr. ID..."
+      class="form-input search-input"
+      autocomplete="off"
+      style="width:100%;"
+    >
+  </div>
   <button class="leet-btn" style="width:auto; padding:12px 26px; font-size:1em;" onclick="openAddPaymentModal()">
       <i class="fa fa-plus"></i> Add Payment
   </button>
@@ -49,8 +59,8 @@
     </thead>
     <tbody class="customers-table-body">
     {% for b in history %}
-    <tr>
-        <td>{{ b.payment_date }}</td>  <!-- Directly use the string -->
+    <tr data-search-text="{{ (b.payment_date or '')|lower }} {{ b.amount_to_be_paid }} {{ b.paid_amount }} {{ b.remaining_amount }} {{ (b.payment_method or '')|lower }} {{ (b.transaction_id or '')|lower }} {{ (b.payment_collected_by or '')|lower }}">
+        <td>{{ b.payment_date }}</td>
         <td>{{ b.amount_to_be_paid }}</td>
         <td>{{ b.paid_amount }}</td>
         <td>{{ b.remaining_amount  }}</td>
@@ -79,7 +89,7 @@
         </td>
     </tr>
     {% else %}
-    <tr>
+    <tr id="no-history-empty">
         <td colspan="8" style="text-align:center;">No billing history found.</td>
     </tr>
     {% endfor %}
@@ -88,6 +98,8 @@
 
 </table>
 </div>
+
+<div class="pagination-wrap" style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:24px;"></div>
 
 <div id="addPaymentModal" class="modal-overlay" style="display:none;">
   <div class="modal-content" style="max-width:400px;">
@@ -117,6 +129,10 @@
       <div class="form-block" style="margin-bottom:5px;">
         <label>Remaining Amount:</label>
         <input type="number" id="modal_remaining_fees" class="form-input" value="{{ amount_to_be_paid }}" readonly>
+      </div>
+      <div class="form-block" style="margin-bottom:5px;">
+        <label>Billing Date:</label>
+        <input type="date" name="billing_date" id="modal_billing_date" class="form-input" value="{{ next_billing_date.strftime('%Y-%m-%d') if next_billing_date else (customer.billing_date.strftime('%Y-%m-%d') if customer.billing_date else '') }}">
       </div>
       <div class="form-block" style="margin-bottom:5px;">
         <label>Payment Method:</label>
@@ -234,6 +250,20 @@ function generateInvoice(billingId) {
 }
 @keyframes toast-in { from {opacity: 0; transform: translateY(-20px);} to {opacity: 0.97; transform: translateY(0);} }
 @keyframes toast-out { from {opacity: 0.97;} to {opacity: 0;} }
+
+.page-btn {
+    padding: 8px 18px;
+    background: #ff7300;
+    color: #fff;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+}
+.page-btn.disabled {
+    background: #444;
+    pointer-events: none;
+    opacity: 0.6;
+}
 </style>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -322,6 +352,94 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Search + pagination (same pattern as customers/billing)
+    var searchInput = document.getElementById("fe-search-input");
+    var tableBody = document.querySelector(".customers-table-body");
+    if (!searchInput || !tableBody) return;
+
+    var allRows = Array.from(tableBody.querySelectorAll("tr:not(#no-history-empty):not(#no-history-row)"));
+    var noHistoryRow = document.getElementById("no-history-row");
+    if (!noHistoryRow) {
+        noHistoryRow = document.createElement("tr");
+        noHistoryRow.id = "no-history-row";
+        noHistoryRow.innerHTML = '<td colspan="8" style="text-align:center; padding:20px; color:#aaa;">No billing history found.</td>';
+        tableBody.appendChild(noHistoryRow);
+    }
+    noHistoryRow.style.display = "none";
+
+    var emptySeed = document.getElementById("no-history-empty");
+    if (emptySeed) emptySeed.style.display = "none";
+
+    var itemsPerPage = 20;
+    var currentPage = 1;
+
+    function updatePagination(page, totalPages) {
+        var paginationWrap = document.querySelector(".pagination-wrap");
+        if (!paginationWrap) return;
+        if (totalPages <= 1) {
+            paginationWrap.style.display = "none";
+            return;
+        }
+        paginationWrap.style.display = "flex";
+        paginationWrap.innerHTML =
+            '<button id="prev-page" class="page-btn ' + (page <= 1 ? "disabled" : "") + '" style="border:none; cursor:pointer;">' +
+            '<i class="fa fa-chevron-left"></i> Prev</button>' +
+            '<span style="color:#ff7300; font-weight:600;">Page ' + page + " of " + totalPages + "</span>" +
+            '<button id="next-page" class="page-btn ' + (page >= totalPages ? "disabled" : "") + '" style="border:none; cursor:pointer;">' +
+            'Next <i class="fa fa-chevron-right"></i></button>';
+
+        var prevBtn = paginationWrap.querySelector("#prev-page");
+        var nextBtn = paginationWrap.querySelector("#next-page");
+        if (page > 1) {
+            prevBtn.addEventListener("click", function () {
+                currentPage--;
+                updateTable();
+            });
+        }
+        if (page < totalPages) {
+            nextBtn.addEventListener("click", function () {
+                currentPage++;
+                updateTable();
+            });
+        }
+    }
+
+    function updateTable() {
+        var query = (searchInput.value || "").toLowerCase().trim();
+        var filteredRows = allRows.filter(function (row) {
+            var searchText = row.getAttribute("data-search-text") || "";
+            return !query || searchText.indexOf(query) !== -1;
+        });
+
+        var totalItems = filteredRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var startIndex = (currentPage - 1) * itemsPerPage;
+        var endIndex = startIndex + itemsPerPage;
+
+        allRows.forEach(function (row) { row.style.display = "none"; });
+
+        if (totalItems === 0) {
+            noHistoryRow.style.display = "";
+        } else {
+            noHistoryRow.style.display = "none";
+            filteredRows.slice(startIndex, endIndex).forEach(function (row) {
+                row.style.display = "";
+            });
+        }
+
+        updatePagination(currentPage, totalPages);
+    }
+
+    searchInput.addEventListener("input", function () {
+        currentPage = 1;
+        updateTable();
+    });
+
+    updateTable();
 });
 </script>
 
