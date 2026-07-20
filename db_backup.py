@@ -37,7 +37,7 @@ DB_CONFIG = {
     "host": os.getenv("DB_HOST", "148.163.100.132"),
     "user": os.getenv("DB_USER", "mygymlahore_admin_alphafitnessgym"),
     "password": os.getenv("DB_PASSWORD", "Waqas@0335"),
-    "database": os.getenv("DB_NAME", "mygymlahore_alphafitnessgym"),
+    "database": os.getenv("DB_NAME", "mygymlahore_alphafitnessgym2"),
     "port": int(os.getenv("DB_PORT", "3306")),
     "charset": "utf8mb4",
     "cursorclass": pymysql.cursors.Cursor,

@@ -1,8 +1,22 @@
+import os
 import threading
 import time
 import webview
 
-from app import app, db, ensure_attendance_schema, ensure_billing_history_schema, ensure_salary_history_schema, start_attendance_cronjob
+# Desktop always uses fast local SQLite. MySQL is used only on Backup push.
+os.environ["DB_BACKEND"] = "sqlite"
+
+from app import (
+    app,
+    db,
+    ensure_attendance_schema,
+    ensure_billing_history_schema,
+    ensure_salary_history_schema,
+    initialize_local_sqlite_data,
+    start_attendance_cronjob,
+    start_backup_cronjob,
+)
+
 
 def run_flask():
     with app.app_context():
@@ -19,8 +33,17 @@ def run_flask():
             ensure_salary_history_schema()
         except Exception as exc:
             app.logger.warning(f"Salary history schema sync skipped: {exc}")
+        try:
+            seed_result = initialize_local_sqlite_data()
+            if seed_result and not seed_result.get("skipped"):
+                app.logger.info("SQLite seed: %s", seed_result.get("message"))
+            elif seed_result and seed_result.get("skipped"):
+                app.logger.info("SQLite seed skipped: %s", seed_result.get("message"))
+        except Exception as exc:
+            app.logger.warning(f"SQLite seed from MySQL skipped: {exc}")
 
     start_attendance_cronjob()
+    start_backup_cronjob()
     app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
@@ -39,10 +62,9 @@ if __name__ == "__main__":
     webview.start(debug=False)
 
 
-
 # '''pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." desktop_launcher.py'''
 
 
 
-"""pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." desktop_launcher.py
+"""pyinstaller --onefile --noconsole --icon "E:\Alpha fitness gym\mygym\static\logo.ico" --add-data "templates;templates" --add-data "static;static" --add-data ".env;." --add-data "data;data" desktop_launcher.py
 """

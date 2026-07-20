@@ -46,10 +46,37 @@ else:
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mygym.db'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_Waheedadmin:Waheed%401122@148.163.100.132:3306/mygymlahore_mygymbarkatmarket'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://mygymlahore_admin_alphafitnessgym:Waqas%400335@148.163.100.132:3306/mygymlahore_alphafitnessgym'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# DB_BACKEND=sqlite  -> local app DB (default — all normal work)
+# DB_BACKEND=mysql   -> only for cPanel hosted site if needed
+from db_sync import (
+    DATA_DIR,
+    hours_since_last_push,
+    load_sync_meta,
+    mysql_uri_from_env,
+    run_full_backup,
+    seed_sqlite_from_dump,
+    should_auto_push,
+    sqlite_uri,
+    sync_status_summary,
+)
+
+# Default SQLite so the app never talks to MySQL unless Backup push runs.
+DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").strip().lower()
+SQLITE_DB_PATH = DATA_DIR / "mygym_local.db"
+BACKUP_AUTO_PUSH_ENABLED = os.getenv("BACKUP_AUTO_PUSH", "1") == "1"
+BACKUP_AUTO_PUSH_HOURS = float(os.getenv("BACKUP_AUTO_PUSH_HOURS", "24"))
+BACKUP_CRON_CHECK_SECONDS = int(os.getenv("BACKUP_CRON_CHECK_SECONDS", "3600"))
+
+if DB_BACKEND == "sqlite":
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    app.config["SQLALCHEMY_DATABASE_URI"] = sqlite_uri(SQLITE_DB_PATH)
+else:
+    # cPanel / explicit mysql mode only
+    app.config["SQLALCHEMY_DATABASE_URI"] = mysql_uri_from_env()
+
+app.config["DB_BACKEND"] = DB_BACKEND
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 login_manager = LoginManager(app)
@@ -73,25 +100,38 @@ app.logger.setLevel(logging.INFO)
 
 
 
+def _table_columns(conn, table_name: str) -> set[str]:
+    """Return existing column names for MySQL or SQLite."""
+    dialect = db.engine.dialect.name
+    if dialect == "sqlite":
+        rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+        # PRAGMA: cid, name, type, notnull, dflt_value, pk
+        return {row[1] for row in rows}
+    rows = conn.execute(text(f"SHOW COLUMNS FROM {table_name}")).fetchall()
+    return {row[0] for row in rows}
+
+
+def _add_column_if_missing(conn, table_name: str, column_name: str, column_sql: str, existing: set[str]) -> None:
+    if column_name in existing:
+        return
+    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"))
+    existing.add(column_name)
+
+
 def ensure_attendance_schema():
     """Best-effort schema patch for deployments without migration tooling."""
     with db.engine.begin() as conn:
-        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM attendance"))}
+        existing = _table_columns(conn, "attendance")
 
-        if "customer_id" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN customer_id INT NULL"))
-        if "thumb_id" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN thumb_id VARCHAR(100) NULL"))
-        if "check_in_at" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN check_in_at DATETIME NULL"))
-        if "source" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN source VARCHAR(50) NULL"))
-        if "device_sn" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN device_sn VARCHAR(100) NULL"))
-        if "raw_uid" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN raw_uid VARCHAR(100) NULL"))
-        if "event_id" not in existing:
-            conn.execute(text("ALTER TABLE attendance ADD COLUMN event_id VARCHAR(120) NULL"))
+        _add_column_if_missing(conn, "attendance", "user_id", "user_id INTEGER", existing)
+        _add_column_if_missing(conn, "attendance", "timestamp", "timestamp DATETIME", existing)
+        _add_column_if_missing(conn, "attendance", "customer_id", "customer_id INTEGER", existing)
+        _add_column_if_missing(conn, "attendance", "thumb_id", "thumb_id VARCHAR(100)", existing)
+        _add_column_if_missing(conn, "attendance", "check_in_at", "check_in_at DATETIME", existing)
+        _add_column_if_missing(conn, "attendance", "source", "source VARCHAR(50)", existing)
+        _add_column_if_missing(conn, "attendance", "device_sn", "device_sn VARCHAR(100)", existing)
+        _add_column_if_missing(conn, "attendance", "raw_uid", "raw_uid VARCHAR(100)", existing)
+        _add_column_if_missing(conn, "attendance", "event_id", "event_id VARCHAR(120)", existing)
 
         index_statements = [
             "CREATE INDEX idx_attendance_thumb_id ON attendance (thumb_id)",
@@ -110,58 +150,90 @@ def ensure_attendance_schema():
 def ensure_billing_history_schema():
     """Best-effort schema patch for billing_history table."""
     with db.engine.begin() as conn:
-        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM billing_history"))}
+        existing = _table_columns(conn, "billing_history")
 
-        if "customer_cnic" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN customer_cnic VARCHAR(20) NULL"))
-        if "customer_name" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN customer_name VARCHAR(120) NULL"))
-        if "membership_no" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN membership_no VARCHAR(20) NULL"))
-        if "amount_to_be_paid" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN amount_to_be_paid INT NULL"))
-        if "paid_amount" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN paid_amount INT NULL"))
-        if "remaining_amount" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN remaining_amount INT NULL"))
-        if "payment_collected_by" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_collected_by VARCHAR(100) NULL"))
-        if "payment_date" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_date DATETIME NULL"))
-        if "payment_method" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN payment_method VARCHAR(50) NULL"))
-        if "transaction_id" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN transaction_id VARCHAR(50) NULL"))
-        if "created_at" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN created_at DATETIME NULL"))
-        if "updated_at" not in existing:
-            conn.execute(text("ALTER TABLE billing_history ADD COLUMN updated_at DATETIME NULL"))
+        _add_column_if_missing(conn, "billing_history", "customer_cnic", "customer_cnic VARCHAR(20)", existing)
+        _add_column_if_missing(conn, "billing_history", "customer_name", "customer_name VARCHAR(120)", existing)
+        _add_column_if_missing(conn, "billing_history", "membership_no", "membership_no VARCHAR(20)", existing)
+        _add_column_if_missing(conn, "billing_history", "amount_to_be_paid", "amount_to_be_paid INTEGER", existing)
+        _add_column_if_missing(conn, "billing_history", "paid_amount", "paid_amount INTEGER", existing)
+        _add_column_if_missing(conn, "billing_history", "remaining_amount", "remaining_amount INTEGER", existing)
+        _add_column_if_missing(conn, "billing_history", "payment_collected_by", "payment_collected_by VARCHAR(100)", existing)
+        _add_column_if_missing(conn, "billing_history", "payment_date", "payment_date DATETIME", existing)
+        _add_column_if_missing(conn, "billing_history", "payment_method", "payment_method VARCHAR(50)", existing)
+        _add_column_if_missing(conn, "billing_history", "transaction_id", "transaction_id VARCHAR(50)", existing)
+        _add_column_if_missing(conn, "billing_history", "created_at", "created_at DATETIME", existing)
+        _add_column_if_missing(conn, "billing_history", "updated_at", "updated_at DATETIME", existing)
 
 
 def ensure_salary_history_schema():
     """Best-effort schema patch for salary_history table."""
     with db.engine.begin() as conn:
-        existing = {row[0] for row in conn.execute(text("SHOW COLUMNS FROM salary_history"))}
+        existing = _table_columns(conn, "salary_history")
 
-        if "employee_id" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN employee_id INT NULL"))
-        if "employee_name" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN employee_name VARCHAR(120) NULL"))
-        if "salary_amount" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN salary_amount INT NULL"))
-        if "payment_type" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN payment_type VARCHAR(20) NULL"))
-        if "payment_method" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN payment_method VARCHAR(50) NULL"))
-        if "transaction_id" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN transaction_id VARCHAR(100) NULL"))
-        if "transaction_date" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN transaction_date DATETIME NULL"))
-        if "created_at" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN created_at DATETIME NULL"))
-        if "updated_at" not in existing:
-            conn.execute(text("ALTER TABLE salary_history ADD COLUMN updated_at DATETIME NULL"))
+        _add_column_if_missing(conn, "salary_history", "employee_id", "employee_id INTEGER", existing)
+        _add_column_if_missing(conn, "salary_history", "employee_name", "employee_name VARCHAR(120)", existing)
+        _add_column_if_missing(conn, "salary_history", "salary_amount", "salary_amount INTEGER", existing)
+        _add_column_if_missing(conn, "salary_history", "payment_type", "payment_type VARCHAR(20)", existing)
+        _add_column_if_missing(conn, "salary_history", "payment_method", "payment_method VARCHAR(50)", existing)
+        _add_column_if_missing(conn, "salary_history", "transaction_id", "transaction_id VARCHAR(100)", existing)
+        _add_column_if_missing(conn, "salary_history", "transaction_date", "transaction_date DATETIME", existing)
+        _add_column_if_missing(conn, "salary_history", "created_at", "created_at DATETIME", existing)
+        _add_column_if_missing(conn, "salary_history", "updated_at", "updated_at DATETIME", existing)
 
+
+def initialize_local_sqlite_data():
+    """Seed local SQLite from local .sql dump only — never contacts MySQL."""
+    if DB_BACKEND != "sqlite":
+        return {"success": True, "skipped": True, "message": "Not using SQLite backend."}
+    from db_sync import resolve_seed_dump
+
+    dump = resolve_seed_dump()
+    return seed_sqlite_from_dump(
+        sqlite_path=SQLITE_DB_PATH,
+        force=False,
+        dump_path=dump,
+    )
+
+
+def backup_cron_loop():
+    """Every hour, full backup (local file + MySQL) if 24h have passed."""
+    while True:
+        try:
+            if DB_BACKEND == "sqlite" and BACKUP_AUTO_PUSH_ENABLED and should_auto_push(BACKUP_AUTO_PUSH_HOURS):
+                with app.app_context():
+                    app.logger.info("Auto backup due — local file + MySQL push...")
+                    result = run_full_backup(
+                        sqlite_path=SQLITE_DB_PATH,
+                        mysql_uri=mysql_uri_from_env(),
+                        label="auto",
+                    )
+                    if result.get("success"):
+                        app.logger.info("Auto backup OK: %s", result.get("message"))
+                    else:
+                        app.logger.warning("Auto backup failed: %s", result.get("message"))
+        except Exception as exc:
+            app.logger.warning("Auto backup cron error: %s", exc)
+        time.sleep(max(300, BACKUP_CRON_CHECK_SECONDS))
+
+
+def start_backup_cronjob():
+    """Start 24h auto-push worker (desktop / SQLite mode only)."""
+    if DB_BACKEND != "sqlite":
+        return
+    if not BACKUP_AUTO_PUSH_ENABLED:
+        app.logger.info("Backup auto-push disabled by config.")
+        return
+    if app.config.get("_backup_cron_started"):
+        return
+    worker = threading.Thread(target=backup_cron_loop, name="backup-cron-worker", daemon=True)
+    worker.start()
+    app.config["_backup_cron_started"] = True
+    app.logger.info(
+        "Backup auto-push started (every %sh, check every %ss).",
+        BACKUP_AUTO_PUSH_HOURS,
+        BACKUP_CRON_CHECK_SECONDS,
+    )
 
 def extract_attendance_events(payload):
     """Normalize attendance payload into an events list."""
@@ -1244,15 +1316,13 @@ def customer_billing(cnic):
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        print("youusername=", user)
-        print("youusername=", user.check_password(form.password.data))
-        if user and not user.check_password(form.password.data):
-            
+        username = (form.username.data or "").strip()
+        password = form.password.data or ""
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid username or password', 'error')
+        flash('Incorrect credentials', 'error')
     return render_template('login.html', form=form)
 
 @app.route('/logout')
@@ -1952,6 +2022,85 @@ def check_username():
     exists = User.query.filter_by(username=username).first() is not None
     return jsonify({'exists': exists})
 
+
+# ========================
+# Backup / Cloud sync (SQLite -> MySQL)
+# ========================
+@app.route('/backup')
+@login_required
+def backup_page():
+    if str(current_user.role_id) != '1':
+        flash('Access denied. Admins only.', 'error')
+        return redirect(url_for('dashboard'))
+    status = sync_status_summary(sqlite_path=SQLITE_DB_PATH) if DB_BACKEND == "sqlite" else {
+        "meta": load_sync_meta(),
+        "hours_since_last_push": hours_since_last_push(),
+        "due_for_auto_push": False,
+        "local_counts": {},
+        "sqlite_path": None,
+    }
+    return render_template(
+        'backup.html',
+        db_backend=DB_BACKEND,
+        auto_push_hours=BACKUP_AUTO_PUSH_HOURS,
+        auto_push_enabled=BACKUP_AUTO_PUSH_ENABLED,
+        status=status,
+    )
+
+
+@app.route('/backup/push', methods=['POST'])
+@login_required
+def backup_push_now():
+    if str(current_user.role_id) != '1':
+        return jsonify({"success": False, "message": "Access denied."}), 403
+    if DB_BACKEND != "sqlite":
+        return jsonify({
+            "success": False,
+            "message": "Backup is only available when the app runs on local SQLite.",
+        }), 400
+
+    # 1) Save local .sql + .db  2) Push to live MySQL
+    result = run_full_backup(
+        sqlite_path=SQLITE_DB_PATH,
+        mysql_uri=mysql_uri_from_env(),
+        label="manual",
+    )
+    code = 200 if result.get("success") else 500
+    return jsonify(result), code
+
+
+@app.route('/backup/reload-dump', methods=['POST'])
+@login_required
+def backup_reload_dump():
+    """Re-import local .sql dump into SQLite (no MySQL connection)."""
+    if str(current_user.role_id) != '1':
+        return jsonify({"success": False, "message": "Access denied."}), 403
+    if DB_BACKEND != "sqlite":
+        return jsonify({
+            "success": False,
+            "message": "Reload dump is only available in SQLite mode.",
+        }), 400
+
+    from db_sync import resolve_seed_dump
+
+    dump = resolve_seed_dump()
+    result = seed_sqlite_from_dump(
+        sqlite_path=SQLITE_DB_PATH,
+        force=True,
+        dump_path=dump,
+    )
+    code = 200 if result.get("success") else 500
+    return jsonify(result), code
+
+
+@app.route('/backup/status')
+@login_required
+def backup_status():
+    if str(current_user.role_id) != '1':
+        return jsonify({"success": False, "message": "Access denied."}), 403
+    return jsonify({"success": True, **sync_status_summary(sqlite_path=SQLITE_DB_PATH)})
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
@@ -1967,6 +2116,13 @@ if __name__ == '__main__':
             ensure_salary_history_schema()
         except Exception as exc:
             app.logger.warning("Salary history schema sync skipped: %s", exc)
+        try:
+            seed_result = initialize_local_sqlite_data()
+            if seed_result and not seed_result.get("skipped"):
+                app.logger.info("SQLite seed: %s", seed_result.get("message"))
+        except Exception as exc:
+            app.logger.warning("SQLite seed skipped: %s", exc)
     start_attendance_cronjob()
+    start_backup_cronjob()
     app.run(debug=True)
 

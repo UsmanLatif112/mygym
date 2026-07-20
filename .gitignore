@@ -32,3 +32,10 @@ build/
 backups/
 *.sql
 !requirements*.txt
+
+# Local SQLite (desktop)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

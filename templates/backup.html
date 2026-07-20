@@ -1,0 +1,156 @@
+<head>
+    {% block head %}
+        <title>Alpha Fitness Gym | Backup</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.png') }}">
+    {% endblock %}
+</head>
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title">Backup</h1>
+<p style="color:#bbb; max-width:720px; margin-top:-8px; margin-bottom:28px;">
+    Backup now saves a local copy under <code>backups/</code> and also pushes data to live MySQL online.
+    Auto-backup runs about every {{ auto_push_hours|int }} hours while the app is open.
+</p>
+
+{% set meta = status.meta or {} %}
+
+<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:28px;">
+    <div class="card-dash" style="text-align:left;">
+        <div class="card-title">Last local backup</div>
+        <div class="card-num" style="font-size:1.05em; word-break:break-word;">
+            {{ meta.last_local_backup_sql or 'Never' }}
+        </div>
+        <div style="margin-top:8px; color:#aaa;">{{ meta.last_local_backup_at or '—' }}</div>
+    </div>
+    <div class="card-dash" style="text-align:left;">
+        <div class="card-title">Last push to MySQL</div>
+        <div class="card-num" style="font-size:1.05em; word-break:break-word;">
+            {{ meta.last_push_at or 'Never' }}
+        </div>
+        <div style="margin-top:8px; color:{% if meta.last_push_status == 'success' %}#7dcea0{% elif meta.last_push_status == 'error' %}#ff6b6b{% else %}#aaa{% endif %};">
+            {{ meta.last_push_status or '—' }}
+        </div>
+    </div>
+    <div class="card-dash" style="text-align:left;">
+        <div class="card-title">Hours since last push</div>
+        <div class="card-num" style="font-size:1.35em;">
+            {% if status.hours_since_last_push is not none %}
+                {{ status.hours_since_last_push }}
+            {% else %}
+                —
+            {% endif %}
+        </div>
+        <div style="margin-top:8px; color:#ffb347;">
+            {% if auto_push_enabled and db_backend == 'sqlite' %}
+                {% if status.due_for_auto_push %}Auto-backup due{% else %}Auto-backup scheduled{% endif %}
+            {% else %}
+                Auto-backup off / N/A
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if meta.last_full_backup_message or meta.last_push_message %}
+<div style="background:#232323; border-radius:10px; padding:14px 18px; margin-bottom:22px; color:#ddd;">
+    <strong style="color:#ffb347;">Last message:</strong>
+    {{ meta.last_full_backup_message or meta.last_push_message }}
+</div>
+{% endif %}
+
+<div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px;">
+    <button class="leet-btn" id="pushBtn" style="width:auto; padding:12px 26px;" {% if db_backend != 'sqlite' %}disabled{% endif %}>
+        <i class="fa fa-save"></i> Backup now (local + MySQL)
+    </button>
+</div>
+
+<div id="backupMessage" style="min-height:24px; margin-bottom:18px; color:#ffb347;"></div>
+
+{% if status.recent_backups %}
+<h2 style="color:#ff7300; font-size:1.2em; margin-bottom:12px;">Recent local backups</h2>
+<table class="customers-table" style="margin-bottom:28px;">
+    <thead>
+        <tr>
+            <th>File</th>
+            <th>Size</th>
+            <th>Modified</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for f in status.recent_backups %}
+        <tr>
+            <td>{{ f.name }}</td>
+            <td>{{ f.size_kb }} KB</td>
+            <td>{{ f.modified }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if status.local_counts %}
+<h2 style="color:#ff7300; font-size:1.2em; margin-bottom:12px;">Local table counts</h2>
+<table class="customers-table">
+    <thead>
+        <tr>
+            <th>Table</th>
+            <th>Rows</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for name, count in status.local_counts.items() %}
+        <tr>
+            <td>{{ name }}</td>
+            <td>{{ count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if status.sqlite_path %}
+<p style="color:#888; margin-top:14px; font-size:0.92em;">SQLite file: {{ status.sqlite_path }}</p>
+{% endif %}
+{% endif %}
+
+<script>
+(function () {
+    const msg = document.getElementById('backupMessage');
+    const pushBtn = document.getElementById('pushBtn');
+
+    function setBusy(busy, text) {
+        pushBtn.disabled = busy || {{ 'true' if db_backend != 'sqlite' else 'false' }};
+        if (text) msg.textContent = text;
+    }
+
+    async function postJson(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {})
+        });
+        const data = await res.json().catch(function () { return {}; });
+        return { ok: res.ok, data: data };
+    }
+
+    pushBtn.addEventListener('click', async function () {
+        if (!confirm('Save local backup and push all data to live MySQL?')) {
+            return;
+        }
+        setBusy(true, 'Saving local backup and pushing to MySQL… please wait.');
+        try {
+            const result = await postJson('{{ url_for("backup_push_now") }}', {});
+            msg.style.color = result.data.success ? '#7dcea0' : '#ff6b6b';
+            msg.textContent = result.data.message || (result.ok ? 'Done.' : 'Backup failed.');
+            if (result.data.success) {
+                setTimeout(function () { window.location.reload(); }, 1200);
+            }
+        } catch (err) {
+            msg.style.color = '#ff6b6b';
+            msg.textContent = 'Backup failed: ' + err;
+        } finally {
+            setBusy(false);
+        }
+    });
+})();
+</script>
+{% endblock %}

@@ -9,7 +9,7 @@ db = SQLAlchemy()
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(255))
     thumb_id = db.Column(db.String(100))
     role_id = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -94,9 +94,12 @@ class Trainer(db.Model):
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=False, index=True)
-    thumb_id = db.Column(db.String(100), nullable=False, index=True)
-    check_in_at = db.Column(db.DateTime, nullable=False, index=True)
+    # Extra columns present in live MySQL / SQL dumps — keep all data as-is
+    user_id = db.Column(db.Integer, nullable=True, index=True)
+    timestamp = db.Column(db.DateTime, nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customer.id'), nullable=True, index=True)
+    thumb_id = db.Column(db.String(100), nullable=True, index=True)
+    check_in_at = db.Column(db.DateTime, nullable=True, index=True)
     source = db.Column(db.String(50), default='zkteco_bridge')
     device_sn = db.Column(db.String(100))
     raw_uid = db.Column(db.String(100))
