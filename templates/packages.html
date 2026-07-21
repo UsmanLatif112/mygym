@@ -12,11 +12,13 @@
 <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Packages</h1>
 
 <!-- Add package button, right-aligned -->
+{% if is_admin %}
 <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;">
     <button class="leet-btn" onclick="openAddModal()" style="width:auto; padding:12px 26px; font-size:1em;">
         <i class="fa fa-plus"></i> Add Package
     </button>
 </div>
+{% endif %}
 
 <table style="width:100%; background:#232323; border-radius:8px; overflow:hidden;">
     <thead>
@@ -26,7 +28,9 @@
             <th style="padding:12px;">Duration</th>
             <th style="padding:12px;">Price</th>
             <th style="padding:12px;">Registration Fees</th>
+            {% if is_admin %}
             <th style="padding:12px;">Action</th>
+            {% endif %}
         </tr>
     </thead>
     <tbody>
@@ -37,15 +41,17 @@
             <td style="padding:12px;">{{ pkg.package_duration }}</td>
             <td style="padding:12px;">{{ pkg.package_price }}</td>
             <td style="padding:12px;">{{ pkg.registration_fees }}</td>
+            {% if is_admin %}
             <td style="padding:12px;">
             <button class="leetpk-btn edit-btn" onclick="openUpdateModal({{ pkg.id }}, '{{ pkg.package_name }}', '{{ pkg.package_type }}', '{{ pkg.package_duration }}', '{{ pkg.package_price }}', '{{ pkg.registration_fees }}')">
                 <i class="fa fa-edit"></i>
             </button>
         </td>
+            {% endif %}
         </tr>
         {% else %}
         <tr>
-            <td colspan="6" style="padding:18px; text-align:center;">No packages found.</td>
+            <td colspan="{{ 6 if is_admin else 5 }}" style="padding:18px; text-align:center;">No packages found.</td>
         </tr>
         {% endfor %}
     </tbody>

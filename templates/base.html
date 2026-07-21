@@ -52,9 +52,7 @@
                 <li><a href="/users"><i class="fa fa-user-cog"></i> Users</a></li>
                 {% endif %}
                 <li><a href="/attendance"><i class="fa fa-fingerprint"></i> Attendance</a></li>
-                {% if current_user.role_id == '1' %}
-                <li><a href="{{ url_for('backup_page') }}"><i class="fa fa-cloud-upload-alt"></i> Backup</a></li>
-                {% endif %}
+                <li><a href="{{ url_for('backup_page') }}"><i class="fa fa-database"></i> Backup</a></li>
                 <li><a href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
             </ul>
         </div>

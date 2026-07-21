@@ -9,12 +9,46 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="page-title">Backup</h1>
-<p style="color:#bbb; max-width:720px; margin-top:-8px; margin-bottom:28px;">
-    Backup now saves a local copy under <code>backups/</code> and also pushes data to live MySQL online.
-    Auto-backup runs about every {{ auto_push_hours|int }} hours while the app is open.
+<p style="color:#bbb; max-width:780px; margin-top:-8px; margin-bottom:28px;">
+    Your live gym data is stored in a local SQLite file on this PC.
+    You can copy that file anytime (USB / another folder) if online backup fails.
 </p>
 
 {% set meta = status.meta or {} %}
+
+<!-- Local SQLite location (easy copy) -->
+<div style="background:#232323; border:1px solid #3a3a3a; border-radius:12px; padding:18px 20px; margin-bottom:28px;">
+    <h2 style="color:#ff7300; font-size:1.15em; margin:0 0 10px 0;">
+        <i class="fa fa-database"></i> Local SQLite database
+    </h2>
+    {% if db_backend == 'sqlite' %}
+    <p style="color:#aaa; margin:0 0 12px 0; font-size:0.95em;">
+        File{% if sqlite_exists %} ({{ sqlite_size_kb }} KB){% endif %}:
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+        <input type="text" id="sqlitePathInput" class="form-input" readonly
+               value="{{ status.sqlite_path or '' }}"
+               style="flex:1; min-width:260px; font-family:Consolas, monospace; font-size:0.92em;">
+        <button type="button" class="leet-btn" id="copyPathBtn" style="width:auto; padding:10px 16px;">
+            <i class="fa fa-copy"></i> Copy path
+        </button>
+        <button type="button" class="leet-btn" id="openFolderBtn" style="width:auto; padding:10px 16px; background:#444; color:#fff;">
+            <i class="fa fa-folder-open"></i> Open folder
+        </button>
+        <a class="leet-btn" href="{{ url_for('backup_download_sqlite') }}"
+           style="width:auto; padding:10px 16px; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+            <i class="fa fa-download"></i> Download .db copy
+        </a>
+    </div>
+    <p style="color:#888; margin:0; font-size:0.9em;">
+        Folder: <span id="sqliteFolderText">{{ sqlite_folder }}</span><br>
+        When you share only the <strong>dist</strong> folder, this file is created next to the app
+        <code>.exe</code> as <code>data\mygym_local.db</code> — copy that file to USB if online backup fails.
+    </p>
+    {% else %}
+    <p style="color:#ffb347; margin:0;">App is not in SQLite mode on this machine.</p>
+    {% endif %}
+</div>
 
 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:28px;">
     <div class="card-dash" style="text-align:left;">
@@ -43,10 +77,10 @@
             {% endif %}
         </div>
         <div style="margin-top:8px; color:#ffb347;">
-            {% if auto_push_enabled and db_backend == 'sqlite' %}
+            {% if auto_push_enabled and db_backend == 'sqlite' and can_push_mysql %}
                 {% if status.due_for_auto_push %}Auto-backup due{% else %}Auto-backup scheduled{% endif %}
             {% else %}
-                Auto-backup off / N/A
+                Auto-backup {% if can_push_mysql %}off / N/A{% else %}(admin only){% endif %}
             {% endif %}
         </div>
     </div>
@@ -59,11 +93,13 @@
 </div>
 {% endif %}
 
+{% if can_push_mysql %}
 <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px;">
     <button class="leet-btn" id="pushBtn" style="width:auto; padding:12px 26px;" {% if db_backend != 'sqlite' %}disabled{% endif %}>
         <i class="fa fa-save"></i> Backup now (local + MySQL)
     </button>
 </div>
+{% endif %}
 
 <div id="backupMessage" style="min-height:24px; margin-bottom:18px; color:#ffb347;"></div>
 
@@ -107,19 +143,60 @@
         {% endfor %}
     </tbody>
 </table>
-{% if status.sqlite_path %}
-<p style="color:#888; margin-top:14px; font-size:0.92em;">SQLite file: {{ status.sqlite_path }}</p>
-{% endif %}
 {% endif %}
 
 <script>
 (function () {
     const msg = document.getElementById('backupMessage');
     const pushBtn = document.getElementById('pushBtn');
+    const copyPathBtn = document.getElementById('copyPathBtn');
+    const openFolderBtn = document.getElementById('openFolderBtn');
+    const pathInput = document.getElementById('sqlitePathInput');
 
+    function setMsg(text, ok) {
+        if (!msg) return;
+        msg.style.color = ok ? '#7dcea0' : '#ffb347';
+        msg.textContent = text || '';
+    }
+
+    if (copyPathBtn && pathInput) {
+        copyPathBtn.addEventListener('click', async function () {
+            const text = pathInput.value || '';
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    pathInput.select();
+                    document.execCommand('copy');
+                }
+                setMsg('SQLite path copied. Paste it in File Explorer address bar or save it for USB copy.', true);
+            } catch (err) {
+                pathInput.select();
+                setMsg('Select the path and press Ctrl+C to copy.', false);
+            }
+        });
+    }
+
+    if (openFolderBtn) {
+        openFolderBtn.addEventListener('click', async function () {
+            try {
+                const res = await fetch('{{ url_for("backup_open_sqlite_folder") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json().catch(function () { return {}; });
+                setMsg(data.message || (res.ok ? 'Folder opened.' : 'Could not open folder.'), res.ok && data.success);
+            } catch (err) {
+                setMsg('Could not open folder: ' + err, false);
+            }
+        });
+    }
+
+    {% if can_push_mysql %}
     function setBusy(busy, text) {
+        if (!pushBtn) return;
         pushBtn.disabled = busy || {{ 'true' if db_backend != 'sqlite' else 'false' }};
-        if (text) msg.textContent = text;
+        if (text) setMsg(text, true);
     }
 
     async function postJson(url, body) {
@@ -132,25 +209,28 @@
         return { ok: res.ok, data: data };
     }
 
-    pushBtn.addEventListener('click', async function () {
-        if (!confirm('Save local backup and push all data to live MySQL?')) {
-            return;
-        }
-        setBusy(true, 'Saving local backup and pushing to MySQL… please wait.');
-        try {
-            const result = await postJson('{{ url_for("backup_push_now") }}', {});
-            msg.style.color = result.data.success ? '#7dcea0' : '#ff6b6b';
-            msg.textContent = result.data.message || (result.ok ? 'Done.' : 'Backup failed.');
-            if (result.data.success) {
-                setTimeout(function () { window.location.reload(); }, 1200);
+    if (pushBtn) {
+        pushBtn.addEventListener('click', async function () {
+            if (!confirm('Save local backup and push all data to live MySQL?')) {
+                return;
             }
-        } catch (err) {
-            msg.style.color = '#ff6b6b';
-            msg.textContent = 'Backup failed: ' + err;
-        } finally {
-            setBusy(false);
-        }
-    });
+            setBusy(true, 'Saving local backup and pushing to MySQL… please wait.');
+            try {
+                const result = await postJson('{{ url_for("backup_push_now") }}', {});
+                msg.style.color = result.data.success ? '#7dcea0' : '#ff6b6b';
+                msg.textContent = result.data.message || (result.ok ? 'Done.' : 'Backup failed.');
+                if (result.data.success) {
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                }
+            } catch (err) {
+                msg.style.color = '#ff6b6b';
+                msg.textContent = 'Backup failed: ' + err;
+            } finally {
+                setBusy(false);
+            }
+        });
+    }
+    {% endif %}
 })();
 </script>
 {% endblock %}

@@ -1,0 +1,4 @@
+# Seed SQLite shipped inside the desktop build.
+# Updated automatically by build_dist.ps1 from data/mygym_local.db
+*
+!.gitignore

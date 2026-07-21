@@ -82,10 +82,12 @@
         <td style="display: flex; justify-content: center; gap: 2px;">
           <button type="button" class="leetpk-btn"  onclick="generateInvoice({{ b.id }})">
                 <i class="fa fa-download"></i>
-            </button>  
+            </button>
+          {% if is_admin %}
           <button type="button" class="leetpk-btn delete-btn"  onclick="openDeleteConfirmationModal('{{ url_for('delete_billing_history', billing_id=b.id, cnic=customer.cnic) }}')">
                 <i class="fa fa-trash"></i>
             </button>
+          {% endif %}
         </td>
     </tr>
     {% else %}

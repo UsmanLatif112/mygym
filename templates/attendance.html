@@ -13,25 +13,46 @@
 <h1 style="color:#ff7300; letter-spacing:1px; margin-bottom: 28px;">Attendance</h1>
 
 <div class="customers-header"
-    style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:26px;">
-    <form method="get" action="{{ url_for('attendance') }}"
-        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
+    style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:26px; flex-wrap:wrap;">
+    <form method="get" action="{{ url_for('attendance') }}" id="attendance-filter-form"
+        style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1; min-width:240px;">
         <input type="text" name="q" placeholder="Search by name, membership, phone, CNIC, or thumb ID..."
             value="{{ q }}" class="form-input search-input" autocomplete="off"
-            style="min-width:250px; flex:1; max-width:350px;">
+            style="min-width:220px; flex:1; max-width:360px;">
         <button class="leet-btn" style="width:auto; padding:10px 18px; font-size:0.95em;" type="submit">
             <i class="fa fa-search"></i> Filter
         </button>
+        <input type="hidden" name="period" id="period-hidden" value="{{ period or 'today' }}">
+        <input type="hidden" name="start" id="start-hidden" value="{{ custom_start or '' }}">
+        <input type="hidden" name="end" id="end-hidden" value="{{ custom_end or '' }}">
     </form>
 
-    <button type="button" id="attendance-sync-btn" class="leet-btn"
-        style="width:auto; padding:10px 18px; font-size:0.95em; white-space:nowrap;">
-        <i class="fa fa-rotate"></i> Sync Now
-    </button>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <select id="period-select" class="form-input"
+            style="width:130px; min-width:130px; max-width:130px; flex:0 0 130px;">
+            <option value="today" {% if period=='today' %}selected{% endif %}>Today</option>
+            <option value="1w" {% if period=='1w' %}selected{% endif %}>1 Week</option>
+            <option value="1m" {% if period=='1m' %}selected{% endif %}>1 Month</option>
+            <option value="3m" {% if period=='3m' %}selected{% endif %}>3 Months</option>
+            <option value="6m" {% if period=='6m' %}selected{% endif %}>6 Months</option>
+            <option value="12m" {% if period=='12m' %}selected{% endif %}>12 Months</option>
+            <option value="all" {% if period=='all' %}selected{% endif %}>All</option>
+            <option value="custom" {% if period=='custom' %}selected{% endif %}>Custom</option>
+        </select>
+        <div id="custom-range-fields" style="display: {% if period=='custom' %}flex{% else %}none{% endif %}; gap:7px; align-items:center;">
+            <input type="date" id="start-select" value="{{ custom_start or '' }}" class="form-input" style="width:140px;">
+            <input type="date" id="end-select" value="{{ custom_end or '' }}" class="form-input" style="width:140px;">
+            <button type="button" class="leet-btn" id="custom-apply-btn" style="width:auto; padding:10px 14px; font-size:0.9em;">Apply</button>
+        </div>
+        <button type="button" id="attendance-sync-btn" class="leet-btn"
+            style="width:auto; padding:10px 18px; font-size:0.95em; white-space:nowrap;">
+            <i class="fa fa-rotate"></i> Sync Now
+        </button>
+    </div>
 </div>
 
 <p style="color:#aaa; font-size:0.9em; margin:-12px 0 18px 0;">
-    Latest attendance updates automatically every {{ auto_sync_seconds }} seconds via AJAX (no page refresh needed).
+    Showing {{ total }} record{{ 's' if total != 1 else '' }} · auto-refresh every {{ auto_sync_seconds }} seconds.
 </p>
 
 <div class="customers-table-wrap">
@@ -53,13 +74,13 @@
 {% if total_pages and total_pages > 1 %}
 <div class="pagination-wrap"
     style="display:flex; justify-content:center; align-items:center; gap:14px; margin-top:24px;">
-    <a href="{{ url_for('attendance', q=q, page=page-1) }}" class="page-btn {% if page <= 1 %}disabled{% endif %}">
+    <a href="{{ url_for('attendance', q=q, page=page-1, period=period, start=custom_start, end=custom_end) }}" class="page-btn {% if page <= 1 %}disabled{% endif %}">
         <i class="fa fa-chevron-left"></i> Prev
     </a>
 
     <span style="color:#ff7300; font-weight:600;">Page {{ page }} of {{ total_pages }}</span>
 
-    <a href="{{ url_for('attendance', q=q, page=page+1) }}"
+    <a href="{{ url_for('attendance', q=q, page=page+1, period=period, start=custom_start, end=custom_end) }}"
         class="page-btn {% if page >= total_pages %}disabled{% endif %}">
         Next <i class="fa fa-chevron-right"></i>
     </a>
@@ -258,6 +279,9 @@
         var syncIntervalMs = {{ auto_sync_seconds }} * 1000;
         var q = {{ q|tojson }};
         var page = {{ page }};
+        var period = {{ period|tojson }};
+        var customStart = {{ custom_start|tojson }};
+        var customEnd = {{ custom_end|tojson }};
         var isRefreshing = false;
         var dataUrl = "{{ url_for('attendance_data') }}";
         var paymentInfoUrlBase = "{{ url_for('billing_payment_info', cnic='__CNIC__') }}";
@@ -267,6 +291,44 @@
         var addPaymentModal = document.getElementById("addPaymentModal");
         var addPaymentForm = document.getElementById("addPaymentForm");
         var currentSubmitUrl = "";
+        var periodSelect = document.getElementById("period-select");
+        var customRangeFields = document.getElementById("custom-range-fields");
+
+        if (periodSelect && customRangeFields) {
+            function syncPeriodHiddens() {
+                var hiddenPeriod = document.getElementById("period-hidden");
+                var hiddenStart = document.getElementById("start-hidden");
+                var hiddenEnd = document.getElementById("end-hidden");
+                var startSel = document.getElementById("start-select");
+                var endSel = document.getElementById("end-select");
+                if (hiddenPeriod) hiddenPeriod.value = periodSelect.value;
+                if (hiddenStart && startSel) hiddenStart.value = startSel.value || "";
+                if (hiddenEnd && endSel) hiddenEnd.value = endSel.value || "";
+            }
+
+            function goWithPeriod(nextPeriod) {
+                period = nextPeriod;
+                syncPeriodHiddens();
+                var form = document.getElementById("attendance-filter-form");
+                if (form) form.submit();
+            }
+
+            periodSelect.addEventListener("change", function () {
+                customRangeFields.style.display = (this.value === "custom") ? "flex" : "none";
+                if (this.value !== "custom") {
+                    goWithPeriod(this.value);
+                } else {
+                    syncPeriodHiddens();
+                }
+            });
+
+            var customApplyBtn = document.getElementById("custom-apply-btn");
+            if (customApplyBtn) {
+                customApplyBtn.addEventListener("click", function () {
+                    goWithPeriod("custom");
+                });
+            }
+        }
 
         var announcedAttendance = new Set();
         try {
@@ -524,6 +586,11 @@
             var params = new URLSearchParams();
             if (q) params.set("q", q);
             if (page > 1) params.set("page", page);
+            if (period) params.set("period", period);
+            if (period === "custom") {
+                if (customStart) params.set("start", customStart);
+                if (customEnd) params.set("end", customEnd);
+            }
             params.set("sync", "1");
 
             fetch(dataUrl + "?" + params.toString(), {

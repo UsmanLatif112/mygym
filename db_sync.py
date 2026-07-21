@@ -2,8 +2,13 @@
 Local SQLite <-> remote MySQL sync for Alpha Fitness Gym.
 
 Desktop app uses SQLite for speed. MySQL on cPanel is the live/cloud copy.
-- seed_sqlite_from_mysql: one-time (or manual) pull when local DB is empty
+- seed from local .sql dump only (never live MySQL unless push)
 - push_sqlite_to_mysql: full replace of MySQL data from local SQLite
+
+When packaged (PyInstaller dist/), writable files live NEXT TO the .exe:
+  dist/data/mygym_local.db
+  dist/backups/
+so users who only receive the dist folder can copy the DB easily.
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +26,27 @@ from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+
+def get_app_root() -> Path:
+    """
+    Writable app root.
+    - Frozen exe: folder that contains the .exe (the shared dist folder)
+    - Dev: mygym/ source folder
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def get_bundle_dir() -> Path:
+    """Read-only bundled resources (_MEIPASS when frozen)."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+
+SCRIPT_DIR = get_app_root()
+BUNDLE_DIR = get_bundle_dir()
 DATA_DIR = SCRIPT_DIR / "data"
 BACKUP_DIR = SCRIPT_DIR / "backups"
 SYNC_META_PATH = DATA_DIR / "sync_meta.json"
@@ -457,21 +483,129 @@ def import_mysql_dump_to_sqlite(
         conn.close()
 
 
-def resolve_seed_dump() -> Path | None:
-    """Prefer configured dump, then the known full backup, then latest .sql in backups/."""
+def resolve_seed_db() -> Path | None:
+    """Find a pre-filled SQLite seed DB shipped with the app (never the live empty target)."""
+    candidates = [
+        SCRIPT_DIR / "seed" / "mygym_seed.db",
+        SCRIPT_DIR / "data" / "mygym_seed.db",
+        BUNDLE_DIR / "seed" / "mygym_seed.db",
+        BUNDLE_DIR / "data" / "mygym_seed.db",
+    ]
+    for p in candidates:
+        try:
+            if p.exists() and p.stat().st_size > 1024:
+                return p
+        except Exception:
+            continue
+    return None
+
+
+def ensure_local_database(sqlite_path: Path | str | None = None) -> dict[str, Any]:
+    """
+    First-install safety for dist/ users:
+    - If local DB already has data -> keep it (never wipe user work)
+    - If missing/empty -> copy bundled seed DB, else import SQL dump
+    """
+    import shutil
+
+    ensure_data_dir()
+    db_path = Path(sqlite_path) if sqlite_path else (DATA_DIR / "mygym_local.db")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Already has data — do not touch
+    if db_path.exists():
+        engine = get_engine(sqlite_uri(db_path))
+        try:
+            if not local_db_is_empty(engine):
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "message": f"Local DB already has data: {db_path}",
+                    "path": str(db_path.resolve()),
+                }
+        finally:
+            engine.dispose()
+
+    # 1) Prefer copying a full seed .db (fast, exact)
+    seed_db = resolve_seed_db()
+    # Avoid copying the same empty/target file onto itself
+    if seed_db and seed_db.resolve() != db_path.resolve():
+        try:
+            # If target exists but empty, replace it with seed
+            if db_path.exists():
+                db_path.unlink()
+            shutil.copy2(seed_db, db_path)
+            engine = get_engine(sqlite_uri(db_path))
+            try:
+                empty = local_db_is_empty(engine)
+            finally:
+                engine.dispose()
+            if not empty:
+                meta = load_sync_meta()
+                now = utc_now_iso()
+                meta.update(
+                    {
+                        "last_seed_at": now,
+                        "last_seed_status": "success",
+                        "last_seed_source": str(seed_db),
+                        "last_seed_message": f"Installed seed DB from {seed_db.name}",
+                        "last_push_at": meta.get("last_push_at") or now,
+                        "last_push_status": meta.get("last_push_status") or "synced_via_seed",
+                    }
+                )
+                save_sync_meta(meta)
+                return {
+                    "success": True,
+                    "skipped": False,
+                    "message": f"Installed local database from seed: {seed_db.name}",
+                    "path": str(db_path.resolve()),
+                    "source": str(seed_db),
+                }
+        except Exception as exc:
+            logger.warning("Seed DB copy failed (%s); trying SQL dump…", exc)
+
+    # 2) Fallback: import from SQL dump (full data, nothing skipped)
+    dump = resolve_seed_dump()
+    if dump and dump.exists():
+        result = import_mysql_dump_to_sqlite(dump, db_path)
+        if result.get("success"):
+            result["path"] = str(db_path.resolve())
+        return result
+
+    return {
+        "success": False,
+        "skipped": False,
+        "message": (
+            "No seed database found. Ship dist/data/mygym_local.db or "
+            "dist/seed/mygym_seed.db (or a backups/*.sql dump) with the app."
+        ),
+        "path": str(db_path.resolve()),
+    }
+    """Prefer configured dump, then dist/backups, then bundled backups, then latest .sql."""
+    candidates: list[Path] = []
+
     configured = os.getenv("SQLITE_SEED_DUMP", "").strip()
     if configured:
         p = Path(configured)
         if not p.is_absolute():
-            p = SCRIPT_DIR / p
+            # Check next to exe first, then inside bundle
+            candidates.append(SCRIPT_DIR / p)
+            candidates.append(BUNDLE_DIR / p)
+        else:
+            candidates.append(p)
+
+    candidates.append(DEFAULT_SEED_DUMP)
+    candidates.append(BUNDLE_DIR / "backups" / "alphafitness_20260720_222616.sql")
+
+    for p in candidates:
         if p.exists():
             return p
-    if DEFAULT_SEED_DUMP.exists():
-        return DEFAULT_SEED_DUMP
-    if BACKUP_DIR.exists():
-        dumps = sorted(BACKUP_DIR.glob("*.sql"), key=lambda x: x.stat().st_mtime, reverse=True)
-        if dumps:
-            return dumps[0]
+
+    for folder in (BACKUP_DIR, BUNDLE_DIR / "backups"):
+        if folder.exists():
+            dumps = sorted(folder.glob("*.sql"), key=lambda x: x.stat().st_mtime, reverse=True)
+            if dumps:
+                return dumps[0]
     return None
 
 
