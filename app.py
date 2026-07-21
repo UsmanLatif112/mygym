@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import BillingHistory, db, User, Customer, Billing, Packages, Employee, Attendance, Expense, SalaryHistory, RemainingAmount
@@ -44,17 +44,27 @@ if os.path.exists(bundled_env):
 else:
     load_dotenv()
 
-app = Flask(__name__)
+# When frozen, templates/static come from the PyInstaller bundle (_MEIPASS).
+_flask_kwargs = {}
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    _flask_kwargs = {
+        "template_folder": os.path.join(sys._MEIPASS, "templates"),
+        "static_folder": os.path.join(sys._MEIPASS, "static"),
+    }
+
+app = Flask(__name__, **_flask_kwargs)
 app.config['SECRET_KEY'] = 'your_secret_key'
 
 # DB_BACKEND=sqlite  -> local app DB (default — all normal work)
 # DB_BACKEND=mysql   -> only for cPanel hosted site if needed
 from db_sync import (
     DATA_DIR,
+    get_app_root,
     hours_since_last_push,
     load_sync_meta,
     mysql_uri_from_env,
     run_full_backup,
+    ensure_local_database,
     seed_sqlite_from_dump,
     should_auto_push,
     sqlite_uri,
@@ -62,7 +72,9 @@ from db_sync import (
 )
 
 # Default SQLite so the app never talks to MySQL unless Backup push runs.
+# Writable DB lives next to the .exe when shared as dist/ (get_app_root).
 DB_BACKEND = os.getenv("DB_BACKEND", "sqlite").strip().lower()
+APP_ROOT = get_app_root()
 SQLITE_DB_PATH = DATA_DIR / "mygym_local.db"
 BACKUP_AUTO_PUSH_ENABLED = os.getenv("BACKUP_AUTO_PUSH", "1") == "1"
 BACKUP_AUTO_PUSH_HOURS = float(os.getenv("BACKUP_AUTO_PUSH_HOURS", "24"))
@@ -71,6 +83,7 @@ BACKUP_CRON_CHECK_SECONDS = int(os.getenv("BACKUP_CRON_CHECK_SECONDS", "3600"))
 if DB_BACKEND == "sqlite":
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     app.config["SQLALCHEMY_DATABASE_URI"] = sqlite_uri(SQLITE_DB_PATH)
+    app.logger.info("SQLite path: %s (app root: %s)", SQLITE_DB_PATH.resolve(), APP_ROOT)
 else:
     # cPanel / explicit mysql mode only
     app.config["SQLALCHEMY_DATABASE_URI"] = mysql_uri_from_env()
@@ -81,6 +94,31 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+DELETE_CONTACT_MSG = "Please contact admin to delete this entry."
+
+
+def is_admin_user(user=None):
+    user = user or current_user
+    return bool(user and getattr(user, "is_authenticated", False) and str(user.role_id) == "1")
+
+
+def deny_delete_for_non_admin(as_json=False):
+    """Block delete actions for non-admin users. Returns a response, or None if allowed."""
+    if is_admin_user():
+        return None
+    if as_json:
+        return jsonify({"success": False, "message": DELETE_CONTACT_MSG}), 403
+    flash(DELETE_CONTACT_MSG, "error")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.context_processor
+def inject_role_helpers():
+    return {
+        "is_admin": is_admin_user(),
+        "DELETE_CONTACT_MSG": DELETE_CONTACT_MSG,
+    }
 
 INGEST_SECRET = os.getenv("ATTENDANCE_INGEST_KEY", "")
 ATTENDANCE_DEDUP_SECONDS = int(os.getenv("ATTENDANCE_DEDUP_SECONDS", "60"))
@@ -183,17 +221,13 @@ def ensure_salary_history_schema():
 
 
 def initialize_local_sqlite_data():
-    """Seed local SQLite from local .sql dump only — never contacts MySQL."""
+    """
+    Ensure local SQLite exists with real data on first install.
+    Never overwrites a DB that already has customer/user data.
+    """
     if DB_BACKEND != "sqlite":
         return {"success": True, "skipped": True, "message": "Not using SQLite backend."}
-    from db_sync import resolve_seed_dump
-
-    dump = resolve_seed_dump()
-    return seed_sqlite_from_dump(
-        sqlite_path=SQLITE_DB_PATH,
-        force=False,
-        dump_path=dump,
-    )
+    return ensure_local_database(sqlite_path=SQLITE_DB_PATH)
 
 
 def backup_cron_loop():
@@ -541,6 +575,56 @@ def customers():
     )
 
 
+def resolve_attendance_period(period=None, custom_start=None, custom_end=None):
+    """Return (period, start_dt, end_dt, custom_start, custom_end) for attendance filters."""
+    period = (period or "today").strip().lower()
+    allowed = {"today", "1w", "1m", "3m", "6m", "12m", "all", "custom"}
+    if period not in allowed:
+        period = "today"
+
+    today = date.today()
+    start_dt = datetime.combine(today, datetime.min.time())
+    end_dt = datetime.combine(today, datetime.max.time())
+
+    if period == "all":
+        return period, None, None, custom_start, custom_end
+    if period == "today":
+        pass
+    elif period == "1w":
+        start_dt = datetime.combine(today - timedelta(days=7), datetime.min.time())
+    elif period == "1m":
+        start_dt = datetime.combine(today - relativedelta(months=1), datetime.min.time())
+    elif period == "3m":
+        start_dt = datetime.combine(today - relativedelta(months=3), datetime.min.time())
+    elif period == "6m":
+        start_dt = datetime.combine(today - relativedelta(months=6), datetime.min.time())
+    elif period == "12m":
+        start_dt = datetime.combine(today - relativedelta(months=12), datetime.min.time())
+    elif period == "custom":
+        try:
+            if custom_start and custom_end:
+                start_day = datetime.strptime(custom_start, "%Y-%m-%d").date()
+                end_day = datetime.strptime(custom_end, "%Y-%m-%d").date()
+                if end_day < start_day:
+                    start_day, end_day = end_day, start_day
+                start_dt = datetime.combine(start_day, datetime.min.time())
+                end_dt = datetime.combine(end_day, datetime.max.time())
+                custom_start = start_day.isoformat()
+                custom_end = end_day.isoformat()
+            else:
+                period = "today"
+                custom_start = None
+                custom_end = None
+        except Exception:
+            period = "today"
+            custom_start = None
+            custom_end = None
+            start_dt = datetime.combine(today, datetime.min.time())
+            end_dt = datetime.combine(today, datetime.max.time())
+
+    return period, start_dt, end_dt, custom_start, custom_end
+
+
 def dedupe_attendance_by_membership(rows):
     """Keep only the latest attendance row per membership number per day."""
     seen = set()
@@ -558,10 +642,15 @@ def dedupe_attendance_by_membership(rows):
     return unique_rows
 
 
-def build_attendance_query(q):
+def build_attendance_query(q, start_dt=None, end_dt=None):
     query = db.session.query(Attendance, Customer).outerjoin(
         Customer, Attendance.thumb_id == Customer.thumb_id
     )
+
+    if start_dt is not None:
+        query = query.filter(Attendance.check_in_at >= start_dt)
+    if end_dt is not None:
+        query = query.filter(Attendance.check_in_at <= end_dt)
 
     if q:
         query = query.filter(
@@ -638,9 +727,12 @@ def serialize_attendance_row(log, customer, today):
 #     }
 
 
-def get_attendance_page_data(q="", page=1, per_page=20):
+def get_attendance_page_data(q="", page=1, per_page=20, period="today", custom_start=None, custom_end=None):
     today = date.today()
-    logs = build_attendance_query(q).all()
+    period, start_dt, end_dt, custom_start, custom_end = resolve_attendance_period(
+        period, custom_start, custom_end
+    )
+    logs = build_attendance_query(q, start_dt=start_dt, end_dt=end_dt).all()
     logs = dedupe_attendance_by_membership(logs)
 
     total = len(logs)
@@ -659,6 +751,11 @@ def get_attendance_page_data(q="", page=1, per_page=20):
         "total_pages": total_pages,
         "total": total,
         "per_page": per_page,
+        "period": period,
+        "custom_start": custom_start or "",
+        "custom_end": custom_end or "",
+        "start_dt": start_dt.isoformat(timespec="seconds") if start_dt else None,
+        "end_dt": end_dt.isoformat(timespec="seconds") if end_dt else None,
     }
 
 
@@ -667,7 +764,16 @@ def get_attendance_page_data(q="", page=1, per_page=20):
 def attendance():
     q = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
-    page_data = get_attendance_page_data(q=q, page=page)
+    period = request.args.get('period', 'today').strip().lower()
+    custom_start = request.args.get('start', '').strip() or None
+    custom_end = request.args.get('end', '').strip() or None
+    page_data = get_attendance_page_data(
+        q=q,
+        page=page,
+        period=period,
+        custom_start=custom_start,
+        custom_end=custom_end,
+    )
 
     return render_template(
         "attendance.html",
@@ -676,6 +782,9 @@ def attendance():
         total=page_data["total"],
         per_page=page_data["per_page"],
         q=q,
+        period=page_data["period"],
+        custom_start=page_data["custom_start"],
+        custom_end=page_data["custom_end"],
         auto_sync_seconds=ATTENDANCE_PAGE_AUTO_SYNC_SECONDS,
         initial_rows=page_data["rows"],
     )
@@ -686,6 +795,9 @@ def attendance():
 def attendance_data():
     q = request.args.get('q', '').strip()
     page = request.args.get('page', 1, type=int)
+    period = request.args.get('period', 'today').strip().lower()
+    custom_start = request.args.get('start', '').strip() or None
+    custom_end = request.args.get('end', '').strip() or None
     should_sync = request.args.get('sync', '0') == '1'
     sync_result = None
 
@@ -696,7 +808,13 @@ def attendance_data():
             app.logger.warning("Attendance auto sync failed: %s", exc)
             return jsonify({"success": False, "error": str(exc)}), 500
 
-    page_data = get_attendance_page_data(q=q, page=page)
+    page_data = get_attendance_page_data(
+        q=q,
+        page=page,
+        period=period,
+        custom_start=custom_start,
+        custom_end=custom_end,
+    )
     return jsonify({
         "success": True,
         "sync": sync_result,
@@ -709,6 +827,9 @@ def attendance_data():
 def attendance_sync_now():
     q = request.form.get('q', '').strip()
     page = request.form.get('page', '1').strip()
+    period = request.form.get('period', 'today').strip().lower()
+    custom_start = request.form.get('start', '').strip()
+    custom_end = request.form.get('end', '').strip()
     auto_sync = (
         request.form.get('auto_sync') == '1'
         or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -741,9 +862,16 @@ def attendance_sync_now():
             return jsonify({"success": False, "error": str(exc)}), 500
         flash(f"Attendance sync failed: {exc}", "error")
 
-    redirect_kwargs = {"q": q} if q else {}
+    redirect_kwargs = {"period": period or "today"}
+    if q:
+        redirect_kwargs["q"] = q
     if page.isdigit() and int(page) > 1:
         redirect_kwargs["page"] = int(page)
+    if period == "custom":
+        if custom_start:
+            redirect_kwargs["start"] = custom_start
+        if custom_end:
+            redirect_kwargs["end"] = custom_end
     return redirect(url_for('attendance', **redirect_kwargs))
 
 
@@ -1093,6 +1221,9 @@ def update_billing_date(cnic):
 @app.route('/delete_customer/<cnic>', methods=['POST', 'GET'])
 @login_required
 def delete_customer(cnic):
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
     db.session.delete(customer)
     db.session.commit()
@@ -1416,8 +1547,9 @@ def add_employee():
 @app.route('/delete_employee/<int:employee_id>', methods=['POST', 'GET'])
 @login_required
 def delete_employee(employee_id):
-    if str(current_user.role_id) != '1':
-        return abort(403)
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     employee = Employee.query.get_or_404(employee_id)
     db.session.delete(employee)
     db.session.commit()
@@ -1425,7 +1557,11 @@ def delete_employee(employee_id):
     return redirect(url_for('employees'))
 
 @app.route('/delete_salary_entry/<int:entry_id>', methods=['GET', 'POST'])
+@login_required
 def delete_salary_entry(entry_id):
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     entry = SalaryHistory.query.get_or_404(entry_id)
     db.session.delete(entry)
     db.session.commit()
@@ -1464,6 +1600,9 @@ def manage_employee(employee_id):
 @app.route('/accounts')
 @login_required
 def accounts():
+    if not is_admin_user():
+        flash("Access denied. Admins only.", "error")
+        return redirect(url_for('dashboard'))
     period = request.args.get('period', '1m')
     custom_start = request.args.get('start')
     custom_end = request.args.get('end')
@@ -1653,6 +1792,9 @@ def billing_history(cnic):
 @app.route('/delete_billing_history/<int:billing_id>/<cnic>', methods=['POST'])
 @login_required
 def delete_billing_history(billing_id, cnic):
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     # Fetch the billing history entry
     history = BillingHistory.query.get_or_404(billing_id)
 
@@ -1816,6 +1958,9 @@ def add_expense():
 @app.route('/delete_expense/<int:expense_id>', methods=['POST'])
 @login_required
 def delete_expense(expense_id):
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     expense = Expense.query.get_or_404(expense_id)
     db.session.delete(expense)
     db.session.commit()
@@ -1831,6 +1976,12 @@ def packages():
 
     if request.method == 'POST':
         mode = request.form.get('mode')
+        # Non-admin cannot edit packages
+        if mode == 'update' and not is_admin_user():
+            return jsonify({'success': False, 'message': 'Please contact admin to edit packages.'}), 403
+        if mode == 'add' and not is_admin_user():
+            return jsonify({'success': False, 'message': 'Please contact admin to add packages.'}), 403
+
         name = request.form.get('package_name')
         package_type = request.form.get('package_type')
         duration = request.form.get('package_duration')
@@ -1876,6 +2027,9 @@ def packages():
 @app.route('/delete_package/<int:package_id>', methods=['POST'])
 @login_required
 def delete_package(package_id):
+    denied = deny_delete_for_non_admin(as_json=True)
+    if denied:
+        return denied
     package = Packages.query.get_or_404(package_id)
     db.session.delete(package)
     db.session.commit()
@@ -2008,7 +2162,11 @@ def edit_user(user_id):
 
 # Delete user
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
 def delete_user(user_id):
+    denied = deny_delete_for_non_admin()
+    if denied:
+        return denied
     user = User.query.get_or_404(user_id)
     db.session.delete(user)
     db.session.commit()
@@ -2029,30 +2187,80 @@ def check_username():
 @app.route('/backup')
 @login_required
 def backup_page():
-    if str(current_user.role_id) != '1':
-        flash('Access denied. Admins only.', 'error')
-        return redirect(url_for('dashboard'))
     status = sync_status_summary(sqlite_path=SQLITE_DB_PATH) if DB_BACKEND == "sqlite" else {
         "meta": load_sync_meta(),
         "hours_since_last_push": hours_since_last_push(),
         "due_for_auto_push": False,
         "local_counts": {},
         "sqlite_path": None,
+        "recent_backups": [],
     }
+    sqlite_exists = SQLITE_DB_PATH.exists() if DB_BACKEND == "sqlite" else False
+    sqlite_size_kb = round(SQLITE_DB_PATH.stat().st_size / 1024, 1) if sqlite_exists else 0
     return render_template(
         'backup.html',
         db_backend=DB_BACKEND,
         auto_push_hours=BACKUP_AUTO_PUSH_HOURS,
         auto_push_enabled=BACKUP_AUTO_PUSH_ENABLED,
         status=status,
+        sqlite_exists=sqlite_exists,
+        sqlite_size_kb=sqlite_size_kb,
+        sqlite_folder=str(SQLITE_DB_PATH.parent.resolve()) if DB_BACKEND == "sqlite" else "",
+        can_push_mysql=is_admin_user(),
     )
+
+
+@app.route('/backup/download-sqlite')
+@login_required
+def backup_download_sqlite():
+    """Download a copy of the local SQLite DB for manual backup / USB copy."""
+    if DB_BACKEND != "sqlite":
+        flash("Local SQLite is not in use.", "error")
+        return redirect(url_for("backup_page"))
+    if not SQLITE_DB_PATH.exists():
+        flash("SQLite database file not found.", "error")
+        return redirect(url_for("backup_page"))
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return send_file(
+        SQLITE_DB_PATH,
+        as_attachment=True,
+        download_name=f"mygym_local_{stamp}.db",
+        mimetype="application/octet-stream",
+    )
+
+
+@app.route('/backup/open-sqlite-folder', methods=['POST'])
+@login_required
+def backup_open_sqlite_folder():
+    """Open the folder that contains the local SQLite file in Windows Explorer."""
+    if DB_BACKEND != "sqlite":
+        return jsonify({"success": False, "message": "Local SQLite is not in use."}), 400
+    folder = SQLITE_DB_PATH.parent.resolve()
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        import subprocess
+        if os.name == "nt":
+            if SQLITE_DB_PATH.exists():
+                subprocess.Popen(["explorer", "/select,", str(SQLITE_DB_PATH.resolve())])
+            else:
+                subprocess.Popen(["explorer", str(folder)])
+        else:
+            subprocess.Popen(["xdg-open", str(folder)])
+        return jsonify({
+            "success": True,
+            "message": f"Opened folder: {folder}",
+            "path": str(SQLITE_DB_PATH.resolve()),
+            "folder": str(folder),
+        })
+    except Exception as exc:
+        return jsonify({"success": False, "message": str(exc)}), 500
 
 
 @app.route('/backup/push', methods=['POST'])
 @login_required
 def backup_push_now():
-    if str(current_user.role_id) != '1':
-        return jsonify({"success": False, "message": "Access denied."}), 403
+    if not is_admin_user():
+        return jsonify({"success": False, "message": "Access denied. Admins only for MySQL push."}), 403
     if DB_BACKEND != "sqlite":
         return jsonify({
             "success": False,
@@ -2073,7 +2281,7 @@ def backup_push_now():
 @login_required
 def backup_reload_dump():
     """Re-import local .sql dump into SQLite (no MySQL connection)."""
-    if str(current_user.role_id) != '1':
+    if not is_admin_user():
         return jsonify({"success": False, "message": "Access denied."}), 403
     if DB_BACKEND != "sqlite":
         return jsonify({
@@ -2096,13 +2304,17 @@ def backup_reload_dump():
 @app.route('/backup/status')
 @login_required
 def backup_status():
-    if str(current_user.role_id) != '1':
-        return jsonify({"success": False, "message": "Access denied."}), 403
     return jsonify({"success": True, **sync_status_summary(sqlite_path=SQLITE_DB_PATH)})
 
 
 if __name__ == '__main__':
     with app.app_context():
+        try:
+            seed_result = initialize_local_sqlite_data()
+            if seed_result and not seed_result.get("skipped"):
+                app.logger.info("SQLite seed: %s", seed_result.get("message"))
+        except Exception as exc:
+            app.logger.warning("SQLite seed skipped: %s", exc)
         db.create_all()
         try:
             ensure_attendance_schema()
@@ -2116,12 +2328,6 @@ if __name__ == '__main__':
             ensure_salary_history_schema()
         except Exception as exc:
             app.logger.warning("Salary history schema sync skipped: %s", exc)
-        try:
-            seed_result = initialize_local_sqlite_data()
-            if seed_result and not seed_result.get("skipped"):
-                app.logger.info("SQLite seed: %s", seed_result.get("message"))
-        except Exception as exc:
-            app.logger.warning("SQLite seed skipped: %s", exc)
     start_attendance_cronjob()
     start_backup_cronjob()
     app.run(debug=True)
