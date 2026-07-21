@@ -1,7 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, User, Customer
+from models import db, User, Customer, Attendance
 from datetime import datetime
 import json
 from dateutil.relativedelta import relativedelta
@@ -130,85 +130,10 @@ def validate_phone(form, field):
 
 
 
-def generate_unique_thumb_id(existing_ids):
-    for length in (4, 5):
-        start = 10 ** (length - 1)
-        end = (10 ** length) - 1
-        for num in range(start, end + 1):
-            candidate = str(num)
-            if candidate not in existing_ids:
-                return candidate
-    raise Exception("No available 4-digit or 5-digit thumb ID found")
-
-
-
-
-
-def create_zkteco_user(thumb_id, name):
-    import os
-    from zk import ZK
-
-    zk_ip = os.getenv("ZK_IP", "")
-    zk_port = int(os.getenv("ZK_PORT", "4370"))
-    zk_timeout = int(os.getenv("ZK_TIMEOUT", "10"))
-    zk_password = int(os.getenv("ZK_PASSWORD", "0"))
-
-    if not zk_ip:
-        raise Exception("ZK_IP is not configured")
-
-    zk = ZK(
-        zk_ip,
-        port=zk_port,
-        timeout=zk_timeout,
-        password=zk_password,
-        force_udp=False,
-        ommit_ping=False,
-    )
-
-    conn = None
-    try:
-        conn = zk.connect()
-        conn.disable_device()
-
-        users = conn.get_users() or []
-        used_uids = {getattr(u, "uid", None) for u in users if getattr(u, "uid", None) is not None}
-
-        next_uid = 1
-        while next_uid in used_uids:
-            next_uid += 1
-
-        conn.set_user(
-            uid=next_uid,
-            name=name[:24] if name else f"User {thumb_id}",
-            privilege=0,
-            password='',
-            group_id='',
-            user_id=str(thumb_id),
-        )
-
-        # Optional / device-dependent:
-        # if hasattr(conn, 'enroll_user'):
-        #     conn.enroll_user(str(thumb_id))
-
-        return {
-            "success": True,
-            "message": f"User created on device with Thumb ID {thumb_id}. Please enroll fingerprint on machine."
-        }
-
-    finally:
-        if conn:
-            try:
-                conn.enable_device()
-                conn.disconnect()
-            except Exception:
-                pass
-
-
-
-def generate_unique_thumb_id():
+def generate_unique_thumb_id(extra_blocked_ids=None):
     """
-    Generate the first available 4-digit or 5-digit thumb ID
-    not already used in Customer.thumb_id.
+    First free 4-digit then 5-digit thumb ID, unused in Customer.thumb_id
+    and not present in extra_blocked_ids (e.g. IDs already on the device).
     """
     existing_ids = {
         str(row[0]).strip()
@@ -217,6 +142,12 @@ def generate_unique_thumb_id():
         .all()
         if row[0]
     }
+    if extra_blocked_ids:
+        existing_ids.update(
+            str(x).strip()
+            for x in extra_blocked_ids
+            if x is not None and str(x).strip()
+        )
 
     for length in (4, 5):
         start = 10 ** (length - 1)
@@ -238,6 +169,9 @@ def zk_connect():
     if not zk_ip:
         raise Exception("ZK_IP is not configured.")
 
+    from zk_windows_fix import silence_zk_ping_console
+    silence_zk_ping_console()
+
     zk = ZK(
         zk_ip,
         port=zk_port,
@@ -249,16 +183,29 @@ def zk_connect():
     return zk.connect()
 
 
-def zk_find_user_by_user_id(conn, user_id):
-    users = conn.get_users() or []
+def zk_get_device_users(conn):
+    return conn.get_users() or []
+
+
+def zk_used_user_ids(users):
+    return {
+        str(getattr(user, "user_id", "")).strip()
+        for user in users
+        if str(getattr(user, "user_id", "")).strip()
+    }
+
+
+def zk_find_user_by_user_id(conn, user_id, users=None):
+    users = users if users is not None else zk_get_device_users(conn)
+    target = str(user_id).strip()
     for user in users:
-        if str(getattr(user, "user_id", "")).strip() == str(user_id).strip():
+        if str(getattr(user, "user_id", "")).strip() == target:
             return user
     return None
 
 
-def zk_get_next_uid(conn):
-    users = conn.get_users() or []
+def zk_get_next_uid(conn, users=None):
+    users = users if users is not None else zk_get_device_users(conn)
     used_uids = {
         getattr(user, "uid", None)
         for user in users
@@ -271,26 +218,43 @@ def zk_get_next_uid(conn):
     return next_uid
 
 
-def zk_create_or_get_user(conn, thumb_id, name):
+def zk_create_or_get_user(conn, thumb_id, name, users=None):
     """
     Ensure a user exists on the device for this thumb_id.
     Returns a dict with uid, user_id, name, created.
     """
-    existing_user = zk_find_user_by_user_id(conn, thumb_id)
+    users = users if users is not None else zk_get_device_users(conn)
+    existing_user = zk_find_user_by_user_id(conn, thumb_id, users=users)
+    display_name = (name or f"User {thumb_id}")[:24]
+
     if existing_user:
+        uid = getattr(existing_user, "uid", None)
+        try:
+            conn.set_user(
+                uid=uid,
+                name=display_name,
+                privilege=0,
+                password="",
+                group_id="",
+                user_id=str(thumb_id),
+            )
+        except Exception as exc:
+            current_app.logger.warning(
+                "Could not refresh device user name for thumb_id=%s: %s", thumb_id, exc
+            )
         return {
-            "uid": getattr(existing_user, "uid", None),
+            "uid": uid,
             "user_id": str(getattr(existing_user, "user_id", "")),
-            "name": getattr(existing_user, "name", ""),
+            "name": display_name,
             "created": False,
         }
 
-    next_uid = zk_get_next_uid(conn)
+    next_uid = zk_get_next_uid(conn, users=users)
 
     conn.set_user(
         uid=next_uid,
-        name=(name or f"User {thumb_id}")[:24],
-        privilege=0,   # normal user
+        name=display_name,
+        privilege=0,
         password="",
         group_id="",
         user_id=str(thumb_id),
@@ -298,7 +262,8 @@ def zk_create_or_get_user(conn, thumb_id, name):
 
     time.sleep(1)
 
-    created_user = zk_find_user_by_user_id(conn, thumb_id)
+    refreshed = zk_get_device_users(conn)
+    created_user = zk_find_user_by_user_id(conn, thumb_id, users=refreshed)
     if created_user:
         return {
             "uid": getattr(created_user, "uid", None),
@@ -313,6 +278,24 @@ def zk_create_or_get_user(conn, thumb_id, name):
         "name": name,
         "created": True,
     }
+
+
+def zk_clear_fingerprint(conn, uid, thumb_id, temp_id=0):
+    """Remove existing fingerprint template so enroll is not blocked as 'already exists'."""
+    try:
+        conn.delete_user_template(uid=uid, temp_id=temp_id, user_id=str(thumb_id))
+        current_app.logger.info(
+            "Cleared fingerprint template uid=%s thumb_id=%s temp_id=%s",
+            uid, thumb_id, temp_id,
+        )
+        time.sleep(0.5)
+        return True
+    except Exception as exc:
+        current_app.logger.info(
+            "No fingerprint to clear for uid=%s thumb_id=%s: %s",
+            uid, thumb_id, exc,
+        )
+        return False
 
 
 def zk_start_enrollment(conn, uid, thumb_id, temp_id=0):
@@ -332,7 +315,7 @@ def zk_start_enrollment(conn, uid, thumb_id, temp_id=0):
         return {
             "success": True,
             "raw_result": result,
-            "message": "Enrollment command sent to machine. Please place finger on machine."
+            "message": "Enrollment started. Place finger on the machine now.",
         }
     except Exception as exc:
         current_app.logger.warning(
@@ -342,35 +325,111 @@ def zk_start_enrollment(conn, uid, thumb_id, temp_id=0):
         return {
             "success": True,
             "raw_result": str(exc),
-            "message": "Enrollment command sent to machine. If prompted, place finger now."
+            "message": f"Enrollment command sent. If machine shows an error, note it. Detail: {exc}",
         }
-
 
 
 def register_or_enroll_customer_on_zkteco(customer):
     """
-    Ensures customer has a thumb_id, ensures device user exists,
-    and sends enrollment command to device.
+    Connect to machine first, assign a thumb_id free in DB and on device,
+    create/update device user, clear old fingerprint if needed, then enroll.
     """
     conn = None
     try:
-        if customer.thumb_id and str(customer.thumb_id).strip():
-            thumb_id = str(customer.thumb_id).strip()
-        else:
-            thumb_id = generate_unique_thumb_id()
-            customer.thumb_id = thumb_id
-            db.session.commit()
-
+        # 1) Talk to machine BEFORE assigning any new ID
         conn = zk_connect()
         conn.disable_device()
 
-        device_user = zk_create_or_get_user(conn, thumb_id, customer.name)
+        users = zk_get_device_users(conn)
+        device_ids = zk_used_user_ids(users)
+
+        def _names_match(device_name, customer_name):
+            left = (device_name or "").strip().lower()[:24]
+            right = (customer_name or "").strip().lower()[:24]
+            return bool(left) and bool(right) and left == right
+
+        previous_thumb_id = (
+            str(customer.thumb_id).strip()
+            if customer.thumb_id and str(customer.thumb_id).strip()
+            else None
+        )
+
+        # 2) Pick / keep thumb_id only if free on machine (and DB)
+        if previous_thumb_id:
+            thumb_id = previous_thumb_id
+            other_owner = (
+                Customer.query
+                .filter(
+                    Customer.thumb_id == thumb_id,
+                    Customer.id != customer.id,
+                )
+                .first()
+            )
+            device_owner = zk_find_user_by_user_id(conn, thumb_id, users=users)
+            needs_new_id = bool(other_owner)
+            if device_owner:
+                device_name = (getattr(device_owner, "name", "") or "").strip()
+                # ID already on machine under a different name -> assign a new free ID
+                if device_name and not _names_match(device_name, customer.name):
+                    needs_new_id = True
+                # ID on machine with no/matching name: reuse for re-enroll
+            elif thumb_id in device_ids:
+                # Present in device id set but not found as owner object — still avoid collision
+                needs_new_id = True
+
+            if needs_new_id:
+                thumb_id = generate_unique_thumb_id(extra_blocked_ids=device_ids)
+                customer.thumb_id = thumb_id
+                db.session.commit()
+        else:
+            thumb_id = generate_unique_thumb_id(extra_blocked_ids=device_ids)
+            customer.thumb_id = thumb_id
+            db.session.commit()
+
+        # Keep existing attendance rows pointing at this customer in sync
+        Attendance.query.filter_by(customer_id=customer.id).update(
+            {"thumb_id": thumb_id}, synchronize_session=False
+        )
+        db.session.commit()
+
+        # If we moved to a new ID, remove the old machine user so punches use the new ID
+        if previous_thumb_id and previous_thumb_id != thumb_id:
+            old_user = zk_find_user_by_user_id(conn, previous_thumb_id, users=users)
+            if old_user:
+                try:
+                    conn.delete_user(
+                        uid=getattr(old_user, "uid", 0) or 0,
+                        user_id=str(previous_thumb_id),
+                    )
+                    current_app.logger.info(
+                        "Deleted old device user thumb_id=%s after reassign to %s",
+                        previous_thumb_id, thumb_id,
+                    )
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "Could not delete old device user thumb_id=%s: %s",
+                        previous_thumb_id, exc,
+                    )
+
+        # 3) Create user on machine only after ID is confirmed free / owned
+        users = zk_get_device_users(conn)
+        device_user = zk_create_or_get_user(
+            conn, thumb_id, customer.name, users=users
+        )
         uid = device_user.get("uid")
 
         if uid is None:
             raise Exception("Unable to determine device UID for enrollment.")
 
+        # 4) Clear old finger template so machine does not say "already exists"
+        zk_clear_fingerprint(conn, uid=uid, thumb_id=thumb_id, temp_id=0)
+
         enroll_result = zk_start_enrollment(conn, uid=uid, thumb_id=thumb_id, temp_id=0)
+
+        # Keep connection alive so device can finish finger capture
+        enroll_wait = int(os.getenv("ZK_ENROLL_WAIT_SECONDS", "15"))
+        if enroll_wait > 0:
+            time.sleep(enroll_wait)
 
         return {
             "success": True,

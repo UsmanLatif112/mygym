@@ -7,6 +7,9 @@ import webview
 # Desktop always uses fast local SQLite. MySQL is used only on Backup push.
 os.environ["DB_BACKEND"] = "sqlite"
 
+from zk_windows_fix import silence_zk_ping_console
+silence_zk_ping_console()
+
 from app import (
     app,
     db,

@@ -38,6 +38,9 @@ def fetch_zkteco_attendance_events(ip, port=4370, timeout=10, password=0):
       uid       -> raw_uid
     """
     from zk import ZK
+    from zk_windows_fix import silence_zk_ping_console
+
+    silence_zk_ping_console()
 
     zk = ZK(
         ip,

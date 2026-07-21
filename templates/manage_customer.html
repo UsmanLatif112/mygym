@@ -279,7 +279,7 @@ function registerFingerprint() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
     statusEl.style.color = '#ffb347';
-    statusEl.innerText = 'Creating user on fingerprint machine...';
+    statusEl.innerText = 'Checking machine for free ID, then enroll... Place finger when asked (~15 sec).';
 
     fetch("{{ url_for('register_customer_fingerprint', cnic=customer.cnic) }}", {
         method: 'POST',

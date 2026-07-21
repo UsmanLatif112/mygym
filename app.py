@@ -29,6 +29,10 @@ from helper import (
 from utils import paginate_list
 from attendance_utils import parse_check_in_at, should_skip_duplicate   
 from zk import ZK
+from zk_windows_fix import silence_zk_ping_console
+
+# Keep ZK ping, but hide Windows CMD flash on every connect
+silence_zk_ping_console()
 
 
 def resource_path(relative_path):
@@ -293,13 +297,28 @@ def thumb_id_has_attendance_on_day(thumb_id, attendance_day):
     ).first() is not None
 
 
+def customer_has_attendance_on_day(customer_id, attendance_day):
+    """Return the attendance row for this customer on the given date, if any."""
+    if not customer_id or not attendance_day:
+        return None
+
+    return Attendance.query.filter(
+        Attendance.customer_id == customer_id,
+        db.func.date(Attendance.check_in_at) == attendance_day,
+    ).first()
+
+
 def process_attendance_events(
     events,
     source_fallback="zkteco_bridge",
     limit_to_today=False,
     one_per_day=True,
 ):
-    """Insert attendance events and return ingestion summary."""
+    """Insert attendance events and return ingestion summary.
+
+    Same customer + same calendar date => update check_in_at only (no new row).
+    Different date => insert a new row.
+    """
     if not isinstance(events, list) or not events:
         return {
             "success": False,
@@ -319,14 +338,15 @@ def process_attendance_events(
             continue
         normalized_events.append((event, check_in_at))
 
-    if one_per_day:
-        normalized_events.sort(key=lambda item: item[1])
+    # Latest punch last so same-day updates end on the newest timestamp
+    normalized_events.sort(key=lambda item: item[1])
 
     inserted = 0
     duplicates = 0
     unknown_ids = []
     invalid = 0
-    batch_seen_days = set()
+    # Cache rows touched in this batch so we update instead of inserting again
+    day_rows = {}
 
     for event, check_in_at in normalized_events:
         thumb_id = str(event.get("thumb_id", "")).strip()
@@ -337,38 +357,65 @@ def process_attendance_events(
             invalid += 1
             continue
 
+        source = str(event.get("source", source_fallback)).strip() or source_fallback
+        device_sn = str(event.get("device_sn", "")).strip() or None
+        raw_uid = str(event.get("raw_uid", "")).strip() or None
+
         customer = Customer.query.filter_by(thumb_id=thumb_id).first()
         if not customer:
+            # Do not store or show unmapped machine IDs on the attendance page
             unknown_ids.append(thumb_id)
             continue
 
-        existing_log = Attendance.query.filter_by(customer_id=customer.id).first()
-        if existing_log:
-            existing_log.check_in_at = check_in_at
-            existing_log.updated_at = datetime.utcnow()
-            existing_log.source = str(event.get("source", source_fallback)).strip() or source_fallback
-            existing_log.device_sn = str(event.get("device_sn", "")).strip() or None
-            existing_log.raw_uid = str(event.get("raw_uid", "")).strip() or None
-            existing_log.event_id = event_id
-            db.session.add(existing_log)
+        day_key = ("customer", customer.id, attendance_day)
+
+        def _apply_fields(row):
+            row.check_in_at = check_in_at
+            row.thumb_id = thumb_id
+            row.customer_id = customer.id
+            row.updated_at = datetime.utcnow()
+            row.source = source
+            row.device_sn = device_sn
+            row.raw_uid = raw_uid
+            row.event_id = event_id
+
+        # Same date already seen in this sync batch -> just refresh timestamp
+        if one_per_day and day_key in day_rows:
+            _apply_fields(day_rows[day_key])
+            db.session.add(day_rows[day_key])
             duplicates += 1
             continue
 
-        attendance = Attendance(
-            customer_id=customer.id,
-            thumb_id=thumb_id,
-            check_in_at=check_in_at,
-            source=str(event.get("source", source_fallback)).strip() or source_fallback,
-            device_sn=str(event.get("device_sn", "")).strip() or None,
-            raw_uid=str(event.get("raw_uid", "")).strip() or None,
-            event_id=event_id
-        )
-        db.session.add(attendance)
-        inserted += 1
+        existing = None
+        if one_per_day:
+            existing = customer_has_attendance_on_day(customer.id, attendance_day)
+
+        if existing:
+            # Same date -> update timestamp only
+            _apply_fields(existing)
+            db.session.add(existing)
+            day_rows[day_key] = existing
+            duplicates += 1
+        else:
+            row = Attendance(
+                customer_id=customer.id,
+                thumb_id=thumb_id,
+                check_in_at=check_in_at,
+                source=source,
+                device_sn=device_sn,
+                raw_uid=raw_uid,
+                event_id=event_id,
+            )
+            db.session.add(row)
+            day_rows[day_key] = row
+            inserted += 1
 
     db.session.commit()
     if unknown_ids:
-        app.logger.warning("Unknown thumb IDs in attendance ingest: %s", ",".join(sorted(set(unknown_ids))))
+        app.logger.warning(
+            "Unknown thumb IDs in attendance ingest: %s",
+            ",".join(sorted(set(unknown_ids))),
+        )
 
     return {
         "success": True,
@@ -474,7 +521,7 @@ def attendance_cron_loop():
         except Exception as exc:
             app.logger.warning("Attendance cron sync failed: %s", exc)
 
-        time.sleep(max(30, ATTENDANCE_CRON_INTERVAL_SECONDS))
+        time.sleep(max(1, ATTENDANCE_CRON_INTERVAL_SECONDS))
 
 
 def start_attendance_cronjob():
@@ -494,7 +541,7 @@ def start_attendance_cronjob():
     source = f"zkteco://{ZK_IP}:{ZK_PORT}" if ZK_IP else ATTENDANCE_FETCH_URL
     app.logger.info(
         "Attendance cron started. interval=%ss source=%s",
-        max(30, ATTENDANCE_CRON_INTERVAL_SECONDS),
+        max(1, ATTENDANCE_CRON_INTERVAL_SECONDS),
         source
     )
 
@@ -643,8 +690,17 @@ def dedupe_attendance_by_membership(rows):
 
 
 def build_attendance_query(q, start_dt=None, end_dt=None):
-    query = db.session.query(Attendance, Customer).outerjoin(
-        Customer, Attendance.thumb_id == Customer.thumb_id
+    # Only show mapped members (never "Unknown (thumb not mapped)").
+    # Prefer customer_id; fall back to thumb_id for legacy rows.
+    query = db.session.query(Attendance, Customer).join(
+        Customer,
+        db.or_(
+            Attendance.customer_id == Customer.id,
+            db.and_(
+                Attendance.customer_id.is_(None),
+                Attendance.thumb_id == Customer.thumb_id,
+            ),
+        ),
     )
 
     if start_dt is not None:
@@ -733,6 +789,8 @@ def get_attendance_page_data(q="", page=1, per_page=20, period="today", custom_s
         period, custom_start, custom_end
     )
     logs = build_attendance_query(q, start_dt=start_dt, end_dt=end_dt).all()
+    # Safety: drop any row without a resolved customer
+    logs = [(log, customer) for log, customer in logs if customer is not None]
     logs = dedupe_attendance_by_membership(logs)
 
     total = len(logs)
