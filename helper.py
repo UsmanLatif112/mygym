@@ -329,10 +329,13 @@ def zk_start_enrollment(conn, uid, thumb_id, temp_id=0):
         }
 
 
-def register_or_enroll_customer_on_zkteco(customer):
+def register_or_enroll_customer_on_zkteco(customer, force_new_id=False):
     """
     Connect to machine first, assign a thumb_id free in DB and on device,
     create/update device user, clear old fingerprint if needed, then enroll.
+
+    force_new_id=True (re-enroll / change finger): always assign a NEW free ID
+    on both DB and machine, delete the old device user, then enroll.
     """
     conn = None
     try:
@@ -343,45 +346,22 @@ def register_or_enroll_customer_on_zkteco(customer):
         users = zk_get_device_users(conn)
         device_ids = zk_used_user_ids(users)
 
-        def _names_match(device_name, customer_name):
-            left = (device_name or "").strip().lower()[:24]
-            right = (customer_name or "").strip().lower()[:24]
-            return bool(left) and bool(right) and left == right
-
         previous_thumb_id = (
             str(customer.thumb_id).strip()
             if customer.thumb_id and str(customer.thumb_id).strip()
             else None
         )
 
-        # 2) Pick / keep thumb_id only if free on machine (and DB)
-        if previous_thumb_id:
-            thumb_id = previous_thumb_id
-            other_owner = (
-                Customer.query
-                .filter(
-                    Customer.thumb_id == thumb_id,
-                    Customer.id != customer.id,
-                )
-                .first()
-            )
-            device_owner = zk_find_user_by_user_id(conn, thumb_id, users=users)
-            needs_new_id = bool(other_owner)
-            if device_owner:
-                device_name = (getattr(device_owner, "name", "") or "").strip()
-                # ID already on machine under a different name -> assign a new free ID
-                if device_name and not _names_match(device_name, customer.name):
-                    needs_new_id = True
-                # ID on machine with no/matching name: reuse for re-enroll
-            elif thumb_id in device_ids:
-                # Present in device id set but not found as owner object — still avoid collision
-                needs_new_id = True
-
-            if needs_new_id:
-                thumb_id = generate_unique_thumb_id(extra_blocked_ids=device_ids)
-                customer.thumb_id = thumb_id
-                db.session.commit()
+        # Re-enroll / change finger: always take a fresh ID free on DB + machine
+        if force_new_id or previous_thumb_id:
+            blocked = set(device_ids)
+            if previous_thumb_id:
+                blocked.add(previous_thumb_id)
+            thumb_id = generate_unique_thumb_id(extra_blocked_ids=blocked)
+            customer.thumb_id = thumb_id
+            db.session.commit()
         else:
+            # First-time enroll (no thumb_id yet)
             thumb_id = generate_unique_thumb_id(extra_blocked_ids=device_ids)
             customer.thumb_id = thumb_id
             db.session.commit()
@@ -392,7 +372,7 @@ def register_or_enroll_customer_on_zkteco(customer):
         )
         db.session.commit()
 
-        # If we moved to a new ID, remove the old machine user so punches use the new ID
+        # Remove old machine user so punches/enroll use the new ID only
         if previous_thumb_id and previous_thumb_id != thumb_id:
             old_user = zk_find_user_by_user_id(conn, previous_thumb_id, users=users)
             if old_user:
@@ -405,13 +385,14 @@ def register_or_enroll_customer_on_zkteco(customer):
                         "Deleted old device user thumb_id=%s after reassign to %s",
                         previous_thumb_id, thumb_id,
                     )
+                    time.sleep(0.5)
                 except Exception as exc:
                     current_app.logger.warning(
                         "Could not delete old device user thumb_id=%s: %s",
                         previous_thumb_id, exc,
                     )
 
-        # 3) Create user on machine only after ID is confirmed free / owned
+        # 3) Create NEW user on machine for the new thumb_id
         users = zk_get_device_users(conn)
         device_user = zk_create_or_get_user(
             conn, thumb_id, customer.name, users=users
@@ -421,8 +402,15 @@ def register_or_enroll_customer_on_zkteco(customer):
         if uid is None:
             raise Exception("Unable to determine device UID for enrollment.")
 
-        # 4) Clear old finger template so machine does not say "already exists"
+        # Clear any leftover template on this slot
         zk_clear_fingerprint(conn, uid=uid, thumb_id=thumb_id, temp_id=0)
+
+        # Enable device so enroll prompt can appear on the machine screen
+        try:
+            conn.enable_device()
+            time.sleep(0.5)
+        except Exception as exc:
+            current_app.logger.warning("enable_device before enroll failed: %s", exc)
 
         enroll_result = zk_start_enrollment(conn, uid=uid, thumb_id=thumb_id, temp_id=0)
 
@@ -436,6 +424,7 @@ def register_or_enroll_customer_on_zkteco(customer):
             "thumb_id": thumb_id,
             "uid": uid,
             "created": device_user.get("created", False),
+            "previous_thumb_id": previous_thumb_id,
             "message": enroll_result["message"],
             "raw_result": enroll_result.get("raw_result"),
         }

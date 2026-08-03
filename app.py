@@ -1236,16 +1236,34 @@ def edit_customer(cnic):
 @login_required
 def register_customer_fingerprint(cnic):
     customer = Customer.query.filter_by(cnic=cnic).first_or_404()
+    payload = request.get_json(silent=True) or {}
+    # Re-enroll / change finger always gets a brand-new ID on DB + machine
+    force_new = bool(payload.get("force_new")) or bool(
+        customer.thumb_id and str(customer.thumb_id).strip()
+    )
 
     try:
-        result = register_or_enroll_customer_on_zkteco(customer)
+        result = register_or_enroll_customer_on_zkteco(
+            customer, force_new_id=force_new
+        )
+
+        prev = result.get("previous_thumb_id")
+        msg = result["message"]
+        if prev and str(prev) != str(result["thumb_id"]):
+            msg = (
+                f"Old ID {prev} replaced. New Thumb ID: {result['thumb_id']}. "
+                f"{result['message']}"
+            )
+        else:
+            msg = f"{result['message']} Thumb ID: {result['thumb_id']}"
 
         return jsonify({
             "success": True,
             "thumb_id": result["thumb_id"],
             "uid": result["uid"],
             "created": result["created"],
-            "message": f"{result['message']} Thumb ID: {result['thumb_id']}"
+            "previous_thumb_id": prev,
+            "message": msg,
         }), 200
 
     except Exception as exc:

@@ -173,6 +173,47 @@
       </div>
   </div>
 </div>
+
+<!-- Active customer: choose inactive OR fingerprint -->
+<div id="activeOptionsModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width: 440px; padding: 20px;">
+      <h2 style="margin: 0 0 12px;">Update Status</h2>
+      <p style="color:#fff; margin-bottom:18px;">Choose an action for this active customer.</p>
+      <div class="modal-actions" style="display:flex; flex-direction:column; gap:10px;">
+          <button type="button" class="leet-btn" style="background:#e91515; color:#fff; width:100%;" onclick="chooseMarkInactive()">
+              <i class="fa fa-user-slash"></i> Mark Inactive
+          </button>
+          <button type="button" class="leet-btn" style="background:#ff7300; color:#fff; width:100%;" onclick="chooseFingerprintAction()">
+              <i class="fa fa-fingerprint"></i>
+              {% if customer.thumb_id %}Regenerate Fingerprint{% else %}Add Fingerprint{% endif %}
+          </button>
+          <button type="button" class="leet-btn modal-close-btn" style="background:#181818; color:#fff; width:100%;" onclick="closeActiveOptionsModal()">Cancel</button>
+      </div>
+  </div>
+</div>
+
+<!-- Active customer fingerprint enroll (same API as payment modal) -->
+<div id="activeFingerprintModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content" style="max-width: 460px; padding: 20px;">
+      <h2 style="margin: 0 0 12px;">{% if customer.thumb_id %}Regenerate Fingerprint{% else %}Add Fingerprint{% endif %}</h2>
+      <p style="color:#ccc; margin-bottom:14px; font-size:14px;">
+          {% if customer.thumb_id %}
+              Current Fingerprint ID: {{ customer.thumb_id }}. Place finger when the machine asks (~15 sec).
+          {% else %}
+              No fingerprint assigned yet. Place finger when the machine asks (~15 sec).
+          {% endif %}
+      </p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+          <button type="button" class="leet-btn" id="activeFpBtn" onclick="registerFingerprint('activeFpBtn', 'activeFpStatus')">
+              <i class="fa fa-fingerprint"></i> {% if customer.thumb_id %}Regenerate Fingerprint{% else %}Add Fingerprint{% endif %}
+          </button>
+          <span id="activeFpStatus" style="color:#fff; font-size:14px;"></span>
+      </div>
+      <div class="modal-actions">
+          <button type="button" class="leet-btn modal-close-btn" style="background:#181818; color:#fff;" onclick="closeActiveFingerprintModal()">Close</button>
+      </div>
+  </div>
+</div>
   </div>
 </div>
 
@@ -271,21 +312,29 @@ function confirmDelete() {
 
 
 <script>
-function registerFingerprint() {
-    const btn = document.getElementById('addFingerprintBtn');
-    const statusEl = document.getElementById('fingerprintStatus');
+function registerFingerprint(btnId, statusId) {
+    const btn = document.getElementById(btnId || 'addFingerprintBtn');
+    const statusEl = document.getElementById(statusId || 'fingerprintStatus');
     const thumbInput = document.getElementById('thumb-id-input');
+    if (!btn || !statusEl) {
+        return;
+    }
 
+    const defaultLabel = btn.innerHTML;
+    const forceNew = {{ 'true' if customer.thumb_id else 'false' }};
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
     statusEl.style.color = '#ffb347';
-    statusEl.innerText = 'Checking machine for free ID, then enroll... Place finger when asked (~15 sec).';
+    statusEl.innerText = forceNew
+        ? 'Assigning new free ID (DB + machine), then enroll... Place finger when asked (~15 sec).'
+        : 'Checking machine for free ID, then enroll... Place finger when asked (~15 sec).';
 
     fetch("{{ url_for('register_customer_fingerprint', cnic=customer.cnic) }}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ force_new: forceNew })
     })
     .then(async response => {
         const data = await response.json();
@@ -306,11 +355,14 @@ function registerFingerprint() {
         statusEl.style.color = '#36b37e';
         statusEl.innerText = data.message || ('Fingerprint ID assigned: ' + data.thumb_id);
         btn.innerHTML = '<i class="fa fa-fingerprint"></i> Re-enroll Fingerprint';
+        if (btnId === 'activeFpBtn') {
+            fingerprintChanged = true;
+        }
     })
     .catch(error => {
         statusEl.style.color = '#ff6b6b';
         statusEl.innerText = error.message;
-        btn.innerHTML = '<i class="fa fa-fingerprint"></i> Add Fingerprint';
+        btn.innerHTML = defaultLabel;
     })
     .finally(() => {
         btn.disabled = false;
@@ -321,6 +373,9 @@ function registerFingerprint() {
 
 
 <script>
+var newStatus = null;
+var fingerprintChanged = false;
+
 function handleStatusUpdate() {
     const currentStatus = "{{ customer.status|lower }}";
 
@@ -329,11 +384,41 @@ function handleStatusUpdate() {
     } else if (currentStatus === 'inactive') {
         openBillingDateModal(); // Open billing date modal for 'inactive' status
     } else if (currentStatus === 'active') {
-        // Confirm change to inactive
-        newStatus = 'inactive';
-        const message = `Are you sure you want to update the customer status to ${newStatus}?`;
-        document.getElementById('confirmationText').innerText = message;
-        document.getElementById('confirmationModal').style.display = 'flex';
+        openActiveOptionsModal();
+    }
+}
+
+function openActiveOptionsModal() {
+    document.getElementById('activeOptionsModal').style.display = 'flex';
+}
+
+function closeActiveOptionsModal() {
+    document.getElementById('activeOptionsModal').style.display = 'none';
+}
+
+function chooseMarkInactive() {
+    closeActiveOptionsModal();
+    newStatus = 'inactive';
+    document.getElementById('confirmationText').innerText =
+        'Are you sure you want to update the customer status to inactive?';
+    document.getElementById('confirmationModal').style.display = 'flex';
+}
+
+function chooseFingerprintAction() {
+    closeActiveOptionsModal();
+    fingerprintChanged = false;
+    const statusEl = document.getElementById('activeFpStatus');
+    if (statusEl) {
+        statusEl.innerText = '';
+        statusEl.style.color = '#fff';
+    }
+    document.getElementById('activeFingerprintModal').style.display = 'flex';
+}
+
+function closeActiveFingerprintModal() {
+    document.getElementById('activeFingerprintModal').style.display = 'none';
+    if (fingerprintChanged) {
+        location.reload();
     }
 }
 
